@@ -1,0 +1,420 @@
+name: Android Build and Test
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - develop
+  pull_request:
+    branches:
+      - main
+      - master
+      - develop
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build and test Android application
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    env:
+      JAVA_VERSION: "17"
+      GRADLE_VERSION: "8.9"
+      ANDROID_API_LEVEL: "35"
+      ANDROID_BUILD_TOOLS: "35.0.0"
+
+      # Set to "true" if unit-test failures should fail the whole workflow.
+      # With "false", the APK is still published and test failures are warnings.
+      FAIL_ON_TEST_FAILURE: "true"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Accept Android SDK licenses
+        shell: bash
+        run: |
+          set -euo pipefail
+          yes | sdkmanager --licenses >/dev/null || true
+
+      - name: Install Android SDK packages
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          sdkmanager \
+            "platform-tools" \
+            "platforms;android-${ANDROID_API_LEVEL}" \
+            "build-tools;${ANDROID_BUILD_TOOLS}"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: ${{ env.GRADLE_VERSION }}
+          cache-read-only: false
+
+      - name: Locate Gradle project and command
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Searching for the Gradle project..."
+
+          SETTINGS_FILE="$(
+            find "${GITHUB_WORKSPACE}" \
+              -maxdepth 6 \
+              -type f \
+              \( -name "settings.gradle" -o -name "settings.gradle.kts" \) \
+              -not -path "*/.git/*" \
+              -not -path "*/build/*" \
+              -print \
+              -quit
+          )"
+
+          if [ -z "${SETTINGS_FILE}" ]; then
+            echo "::error::No settings.gradle or settings.gradle.kts file was found."
+            exit 1
+          fi
+
+          GRADLE_PROJECT_DIR="$(dirname "${SETTINGS_FILE}")"
+          GRADLE_WRAPPER="${GRADLE_PROJECT_DIR}/gradlew"
+
+          if [ -f "${GRADLE_WRAPPER}" ]; then
+            echo "Using repository Gradle wrapper."
+            chmod +x "${GRADLE_WRAPPER}"
+            GRADLE_COMMAND="${GRADLE_WRAPPER}"
+          else
+            echo "::warning::No Gradle wrapper was found. Using installed Gradle ${GRADLE_VERSION}."
+            GRADLE_COMMAND="$(command -v gradle || true)"
+
+            if [ -z "${GRADLE_COMMAND}" ]; then
+              echo "::error::Gradle is not available on PATH."
+              exit 1
+            fi
+          fi
+
+          echo "GRADLE_PROJECT_DIR=${GRADLE_PROJECT_DIR}" >> "${GITHUB_ENV}"
+          echo "GRADLE_COMMAND=${GRADLE_COMMAND}" >> "${GITHUB_ENV}"
+
+          echo "Settings file: ${SETTINGS_FILE}"
+          echo "Gradle project: ${GRADLE_PROJECT_DIR}"
+          echo "Gradle command: ${GRADLE_COMMAND}"
+
+      - name: Configure Android SDK location
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf 'sdk.dir=%s\n' "${ANDROID_SDK_ROOT}" > "${GRADLE_PROJECT_DIR}/local.properties"
+          echo "Created ${GRADLE_PROJECT_DIR}/local.properties"
+
+      - name: Display environment information
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Java version:"
+          java -version
+
+          echo ""
+          echo "Gradle version:"
+          cd "${GRADLE_PROJECT_DIR}"
+          "${GRADLE_COMMAND}" --version
+
+          echo ""
+          echo "Android SDK root:"
+          echo "${ANDROID_SDK_ROOT}"
+
+      - name: Validate Gradle project
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "${GRADLE_PROJECT_DIR}"
+
+          "${GRADLE_COMMAND}" projects \
+            --no-daemon \
+            --console=plain
+
+      - name: Display available Android tasks
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "${GRADLE_PROJECT_DIR}"
+
+          "${GRADLE_COMMAND}" tasks \
+            --all \
+            --no-daemon \
+            --console=plain \
+            | tee "${GITHUB_WORKSPACE}/gradle-tasks.log"
+
+          echo ""
+          echo "Relevant build and test tasks:"
+
+          grep -iE \
+            "assemble.*debug|package.*debug|bundle.*debug|test.*debug.*unit" \
+            "${GITHUB_WORKSPACE}/gradle-tasks.log" || true
+
+      - name: Build debug APK
+        id: build_apk
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          cd "${GRADLE_PROJECT_DIR}"
+
+          "${GRADLE_COMMAND}" assembleDebug \
+            --no-daemon \
+            --console=plain \
+            --warning-mode=all \
+            2>&1 | tee "${GITHUB_WORKSPACE}/gradle-build.log"
+
+      - name: Print actual Gradle build error
+        if: steps.build_apk.outcome == 'failure'
+        shell: bash
+        run: |
+          LOG_FILE="${GITHUB_WORKSPACE}/gradle-build.log"
+
+          echo "========================================"
+          echo "Gradle build failure"
+          echo "========================================"
+
+          if [ ! -f "${LOG_FILE}" ]; then
+            echo "::warning::The Gradle build log was not found."
+            exit 0
+          fi
+
+          echo ""
+          echo "Failure section:"
+          echo "----------------------------------------"
+
+          awk '
+            /FAILURE: Build failed with an exception\./ {
+              printing = 1
+            }
+            printing {
+              print
+            }
+            /BUILD FAILED/ {
+              exit
+            }
+          ' "${LOG_FILE}" | head -n 300 || true
+
+          echo ""
+          echo "Compiler and task errors:"
+          echo "----------------------------------------"
+
+          grep -n -m 100 -E \
+            "What went wrong:|Execution failed for task|Caused by:|^[[:space:]]*e: |^[[:space:]]*error:|Android resource linking failed|Manifest merger failed|Could not resolve|Could not find|Duplicate class|Duplicate resources|Unresolved reference|requires compileSdk|AAPT: error|Compilation error" \
+            "${LOG_FILE}" || true
+
+          echo ""
+          echo "Last 150 lines:"
+          echo "----------------------------------------"
+          tail -n 150 "${LOG_FILE}" || true
+
+      - name: Locate generated APK files
+        if: steps.build_apk.outcome == 'success'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Searching for generated APK files..."
+
+          mapfile -t APK_FILES < <(
+            find "${GITHUB_WORKSPACE}" \
+              -type f \
+              -path "*/build/outputs/apk/*" \
+              -name "*.apk" \
+              -print
+          )
+
+          if [ "${#APK_FILES[@]}" -eq 0 ]; then
+            echo "::error::Gradle succeeded, but no APK was found."
+
+            find "${GITHUB_WORKSPACE}" \
+              -type f \
+              \( -name "*.apk" -o -name "*.aab" -o -name "*.aar" \) \
+              -print || true
+
+            exit 1
+          fi
+
+          echo "Found ${#APK_FILES[@]} APK file(s):"
+          printf '%s\n' "${APK_FILES[@]}"
+
+      - name: Upload debug APK
+        if: steps.build_apk.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: matchreview-debug-apk
+          path: "**/build/outputs/apk/**/*.apk"
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 6
+          overwrite: false
+          include-hidden-files: false
+
+      - name: Run debug unit tests
+        id: unit_tests
+        if: steps.build_apk.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          cd "${GRADLE_PROJECT_DIR}"
+
+          if grep -q "testDebugUnitTest" "${GITHUB_WORKSPACE}/gradle-tasks.log"; then
+            TEST_TASK="testDebugUnitTest"
+          else
+            TEST_TASK="test"
+          fi
+
+          echo "Running Gradle task: ${TEST_TASK}"
+
+          "${GRADLE_COMMAND}" "${TEST_TASK}" \
+            --no-daemon \
+            --console=plain \
+            --warning-mode=all \
+            2>&1 | tee "${GITHUB_WORKSPACE}/gradle-test.log"
+
+      - name: Print actual unit-test error
+        if: steps.unit_tests.outcome == 'failure'
+        shell: bash
+        run: |
+          LOG_FILE="${GITHUB_WORKSPACE}/gradle-test.log"
+
+          echo "========================================"
+          echo "Gradle unit-test failure"
+          echo "========================================"
+
+          if [ ! -f "${LOG_FILE}" ]; then
+            echo "::warning::The Gradle test log was not found."
+            exit 0
+          fi
+
+          awk '
+            /FAILURE: Build failed with an exception\./ {
+              printing = 1
+            }
+            printing {
+              print
+            }
+            /BUILD FAILED/ {
+              exit
+            }
+          ' "${LOG_FILE}" | head -n 300 || true
+
+          echo ""
+          echo "Test and compiler errors:"
+          echo "----------------------------------------"
+
+          grep -n -m 100 -E \
+            "What went wrong:|Execution failed for task|Caused by:|FAILED|AssertionError|expected:|but was:|^[[:space:]]*e: |^[[:space:]]*error:" \
+            "${LOG_FILE}" || true
+
+          echo ""
+          echo "Last 150 lines:"
+          echo "----------------------------------------"
+          tail -n 150 "${LOG_FILE}" || true
+
+      - name: Upload Gradle logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gradle-logs
+          path: |
+            gradle-build.log
+            gradle-test.log
+            gradle-tasks.log
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-test-reports
+          path: |
+            **/build/reports/tests/**
+            **/build/test-results/**
+            **/build/reports/problems/**
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Display diagnostics
+        if: always()
+        shell: bash
+        run: |
+          echo "Gradle configuration files:"
+
+          find "${GITHUB_WORKSPACE}" \
+            -maxdepth 6 \
+            -type f \
+            \( \
+              -name "gradlew" \
+              -o -name "settings.gradle" \
+              -o -name "settings.gradle.kts" \
+              -o -name "build.gradle" \
+              -o -name "build.gradle.kts" \
+              -o -name "gradle-wrapper.properties" \
+              -o -name "libs.versions.toml" \
+            \) \
+            -print || true
+
+          echo ""
+          echo "Android artifacts:"
+
+          find "${GITHUB_WORKSPACE}" \
+            -type f \
+            \( -name "*.apk" -o -name "*.aab" -o -name "*.aar" \) \
+            -print || true
+
+      - name: Set final workflow status
+        if: always()
+        shell: bash
+        run: |
+          BUILD_OUTCOME="${{ steps.build_apk.outcome }}"
+          TEST_OUTCOME="${{ steps.unit_tests.outcome }}"
+
+          echo "APK build outcome: ${BUILD_OUTCOME}"
+          echo "Unit-test outcome: ${TEST_OUTCOME}"
+          echo "Fail on test failure: ${FAIL_ON_TEST_FAILURE}"
+
+          if [ "${BUILD_OUTCOME}" = "failure" ]; then
+            echo "::error::The Android debug APK build failed."
+            echo "Review the printed error or download the gradle-logs artifact."
+            exit 1
+          fi
+
+          if [ "${TEST_OUTCOME}" = "failure" ]; then
+            if [ "${FAIL_ON_TEST_FAILURE}" = "true" ]; then
+              echo "::error::The Android unit tests failed."
+              echo "Review the printed error or download the gradle-logs artifact."
+              exit 1
+            fi
+
+            echo "::warning::The Android unit tests failed, but the APK build succeeded."
+            echo "::warning::The workflow remains successful because FAIL_ON_TEST_FAILURE=false."
+            echo "Download android-test-reports and gradle-logs to diagnose the failed tests."
+          fi
+
+          if [ "${BUILD_OUTCOME}" = "success" ]; then
+            echo "Android debug APK built successfully."
+          fi
