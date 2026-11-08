@@ -90,8 +90,8 @@ class PeriodRecordingController(private val context: Context) {
             is CameraRecordingState.Recording, is CameraRecordingState.Preparing -> return
             else -> Unit
         }
-        if (!granted(Manifest.permission.CAMERA)) {
-            return fail("Recording did not restart for the new period: camera permission is missing.")
+        if (!granted(Manifest.permission.CAMERA) || !RecordingPermissions.canSaveVideo(context)) {
+            return fail("Recording did not restart for the new period: camera or storage permission is missing.")
         }
         val available = runCatching {
             val path = context.getExternalFilesDir(Environment.DIRECTORY_MOVIES) ?: context.filesDir

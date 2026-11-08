@@ -133,6 +133,10 @@ class MatchRecordingService : LifecycleService() {
             )
             return
         }
+        if (!RecordingPermissions.canSaveVideo(this)) {
+            refuseStart("Storage permission is required to save the video")
+            return
+        }
 
         val movies = runCatching {
             getExternalFilesDir(Environment.DIRECTORY_MOVIES) ?: filesDir
@@ -214,12 +218,20 @@ class MatchRecordingService : LifecycleService() {
 
     private fun startCameraXRecording(videoCapture: VideoCapture<Recorder>) {
         val id = segmentId ?: return failCurrent("Recording segment was not created")
+        val fileName = "MatchReview_" + SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
         val values = ContentValues().apply {
-            put(MediaStore.Video.Media.DISPLAY_NAME, "MatchReview_" +
-                SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date()))
+            put(MediaStore.Video.Media.DISPLAY_NAME, fileName)
             put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 put(MediaStore.Video.Media.RELATIVE_PATH, Environment.DIRECTORY_MOVIES + "/MatchReview")
+            } else {
+                // Android 9 and older have no relative path: name the file in Movies/MatchReview.
+                @Suppress("DEPRECATION")
+                val folder = java.io.File(
+                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES), "MatchReview"
+                ).apply { mkdirs() }
+                @Suppress("DEPRECATION")
+                put(MediaStore.Video.Media.DATA, java.io.File(folder, "$fileName.mp4").absolutePath)
             }
         }
         val output = MediaStoreOutputOptions.Builder(

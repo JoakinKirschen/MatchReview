@@ -104,6 +104,7 @@ fun CameraMatchPanel(
 
     fun permissionsNeeded(): Array<String> = buildList {
         add(Manifest.permission.CAMERA)
+        addAll(RecordingPermissions.storage)
         if (audioEnabled) add(Manifest.permission.RECORD_AUDIO)
         if (Build.VERSION.SDK_INT >= 33) add(Manifest.permission.POST_NOTIFICATIONS)
     }.toTypedArray()
@@ -115,6 +116,7 @@ fun CameraMatchPanel(
 
     fun hasRequiredPermissions(): Boolean =
         ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED &&
+            RecordingPermissions.canSaveVideo(context) &&
             (!audioEnabled ||
                 ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED)
 
@@ -142,12 +144,13 @@ fun CameraMatchPanel(
             context, Manifest.permission.CAMERA
         ) == PackageManager.PERMISSION_GRANTED
         if (grants[Manifest.permission.CAMERA] == true &&
+            RecordingPermissions.canSaveVideo(context) &&
             (!audioEnabled || grants[Manifest.permission.RECORD_AUDIO] == true)
         ) {
             permissionMessage = null
             if (pendingStart) startRecording()
         } else {
-            permissionMessage = "Camera permission is required. Microphone permission is only required when audio is enabled."
+            permissionMessage = "Camera permission is required (and storage on Android 9 and older). Microphone permission is only required when audio is enabled."
         }
         pendingStart = false
     }
