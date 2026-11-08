@@ -14,6 +14,7 @@ import android.os.Environment
 import android.os.StatFs
 import android.os.SystemClock
 import android.provider.MediaStore
+import android.view.Surface
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.Preview
@@ -194,7 +195,11 @@ class MatchRecordingService : LifecycleService() {
                 val recorder = Recorder.Builder()
                     .setQualitySelector(QualitySelector.from(Quality.HD))
                     .build()
-                val videoCapture = VideoCapture.withOutput(recorder)
+                // Record in the orientation the phone was held at the start, so a match
+                // filmed in landscape plays back in landscape.
+                val videoCapture = VideoCapture.Builder(recorder)
+                    .setTargetRotation(surfaceRotation(orientationDegrees))
+                    .build()
                 val selector = if (lens == CameraLens.FRONT)
                     CameraSelector.DEFAULT_FRONT_CAMERA else CameraSelector.DEFAULT_BACK_CAMERA
 
@@ -453,6 +458,40 @@ class MatchRecordingService : LifecycleService() {
          * Stops and saves the running recording, if any. The service is already in the
          * foreground while recording, so a plain start request is used.
          */
+        fun requestStart(
+            context: Context,
+            matchId: Long,
+            matchClockStartMs: Long,
+            audioEnabled: Boolean,
+            lens: CameraLens,
+            orientationDegrees: Int = currentOrientationDegrees(context)
+        ) {
+            val intent = Intent(context, MatchRecordingService::class.java)
+                .setAction(ACTION_START)
+                .putExtra(EXTRA_MATCH_ID, matchId)
+                .putExtra(EXTRA_MATCH_CLOCK_START_MS, matchClockStartMs.coerceAtLeast(0L))
+                .putExtra(EXTRA_AUDIO_ENABLED, audioEnabled)
+                .putExtra(EXTRA_ORIENTATION_DEGREES, orientationDegrees)
+                .putExtra(EXTRA_LENS, lens.name)
+            ContextCompat.startForegroundService(context, intent)
+        }
+
+        /** How far the screen is turned from its natural orientation, in degrees. */
+        fun currentOrientationDegrees(context: Context): Int =
+            when (runCatching { ContextCompat.getDisplayOrDefault(context).rotation }.getOrDefault(Surface.ROTATION_0)) {
+                Surface.ROTATION_90 -> 90
+                Surface.ROTATION_180 -> 180
+                Surface.ROTATION_270 -> 270
+                else -> 0
+            }
+
+        private fun surfaceRotation(degrees: Int): Int = when (degrees) {
+            90 -> Surface.ROTATION_90
+            180 -> Surface.ROTATION_180
+            270 -> Surface.ROTATION_270
+            else -> Surface.ROTATION_0
+        }
+
         fun requestStop(context: Context, matchClockEndMs: Long?) {
             if (!CameraRecordingController.state.value.isBusy) return
             val intent = Intent(context, MatchRecordingService::class.java).setAction(ACTION_STOP)

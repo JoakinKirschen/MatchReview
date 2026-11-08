@@ -5,6 +5,7 @@ import be.matchreview.app.backup.AutoBackupController
 import be.matchreview.app.backup.MatchBackupManager
 import be.matchreview.app.data.AppDatabase
 import be.matchreview.app.data.MatchRepository
+import be.matchreview.app.recording.PeriodRecordingController
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -17,6 +18,7 @@ class MatchReviewApplication : Application() {
     val repository by lazy { MatchRepository(database.matchDao()) }
     val backupManager by lazy { MatchBackupManager(this, database) }
     val autoBackup by lazy { AutoBackupController(this, backupManager, applicationScope) }
+    val periodRecording by lazy { PeriodRecordingController(this) }
 
     override fun onCreate() {
         super.onCreate()

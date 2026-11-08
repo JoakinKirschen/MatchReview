@@ -1,7 +1,7 @@
 # MatchReview Pass Changelog
 
 This is the **single source of truth** for implementation-pass notes and change tracking.
-It consolidates implementation notes for Passes 1–64.
+It consolidates implementation notes for Passes 1–65.
 
 ## How to maintain this file
 
@@ -37,7 +37,7 @@ For every future development pass:
 
 | Pass | Status | Planned change | Version impact |
 |---:|---|---|---|
-| 65 | Not scheduled | Add the next approved recommendation here | To be determined |
+| 66 | Not scheduled | Add the next approved recommendation here | To be determined |
 
 ## Documentation changes
 
@@ -1474,3 +1474,24 @@ begin.
 
 ### Tests and verification
 - Checked screen by screen with the CI screenshots; all unit tests pass.
+
+## Pass 65 — Landscape, full match video and period-by-period recording
+
+**Status:** Completed  
+**Completed:** 2026-11-08  
+**Version impact:** None (no database or backup-format change)
+
+### Added or changed
+- Turning the phone no longer restarts the screen (`configChanges` on `MainActivity`), so the camera preview, open sheets, drags and the chosen live tab survive a rotation. The live tab is also saved state.
+- Landscape layouts: the live match screen puts score, quick actions and clock buttons in a 320 dp side panel and gives the rest of the screen to the pitch, camera or timeline; the lineup, substitution mode and live pitch lie on their side (our goal on the left) with the bench in a column beside them (`PitchOrientation`); the squad screen shows its filters beside the player list; top-level screens use a navigation rail instead of the bottom bar.
+- Camera tab: on a wide, short preview the controls stand along the right edge like a camera app; clips are recorded in the orientation the phone was held at the start (`VideoCapture` target rotation).
+- Recording follows the periods (`PeriodRecordingController`, `PeriodRecordingRules`): ending a period saves the running recording, starting the next period records again with the same sound and camera. A switch in the camera tab turns this off; the pending restart is shown on the live screen and survives the app being closed at half-time.
+- Full match video (`MatchVideoDialog`, `MatchVideoRules`): all saved clips play back to back, full screen, with the match clock, a list of periods/clips and events to jump to. Opened from Review → Video → "Watch full match" and from the camera tab.
+
+### Tests and verification
+- `PitchOrientationTest`, `PeriodRecordingRulesTest`, `MatchVideoRulesTest`; all 178 unit tests pass.
+- `LandscapeScreenshotTest` renders every screenshot screen at 760 × 360 dp; a new `fullMatchVideo` screenshot covers the viewer.
+
+### Deferred or known limitations
+- The recording stops when the coach ends the period, not when the planned period time is reached, so added time is still filmed.
+- A clip keeps the orientation it started in; turning the phone mid-recording affects the next clip.

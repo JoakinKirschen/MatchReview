@@ -91,7 +91,7 @@ fun VideoEventPlaybackSheet(
     }
 }
 
-private fun eventPlaybackTitle(event: MatchEvent, playersById: Map<Long, Player>): String =
+internal fun eventPlaybackTitle(event: MatchEvent, playersById: Map<Long, Player>): String =
     when (event.type) {
         "OUR_GOAL" -> "Goal • ${playersById[event.playerId]?.name ?: "Unknown scorer"}"
         "OPPONENT_GOAL" -> "Opponent goal"

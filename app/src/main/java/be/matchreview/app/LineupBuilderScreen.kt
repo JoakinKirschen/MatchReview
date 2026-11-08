@@ -3,6 +3,7 @@ package be.matchreview.app
 import be.matchreview.app.ui.AppButton
 import be.matchreview.app.ui.AppOutlinedButton
 import be.matchreview.app.ui.AppTonalButton
+import be.matchreview.app.ui.isLandscape
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -10,6 +11,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -40,6 +45,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -52,6 +58,7 @@ import be.matchreview.app.data.Player
 import be.matchreview.app.domain.FormationLayout
 import be.matchreview.app.domain.FormationSlot
 import be.matchreview.app.domain.LineupDragDropRules
+import be.matchreview.app.domain.PitchOrientation
 import be.matchreview.app.domain.SubstitutionDrop
 import be.matchreview.app.domain.SubstitutionPlanRules
 import kotlin.coroutines.cancellation.CancellationException
@@ -119,6 +126,7 @@ fun LineupBuilderScreen(
 
     val haptics = LocalHapticFeedback.current
     val playerHitRadiusPx = with(LocalDensity.current) { 40.dp.toPx() }
+    val landscape = isLandscape()
 
     /**
      * Where [playerId] lands if released at [pointer], using the same rules as substitution
@@ -128,14 +136,15 @@ fun LineupBuilderScreen(
     fun dropAt(playerId: Long, pointer: Offset): SubstitutionDrop? {
         val pitch = pitchBounds ?: return null
         if (!pitch.contains(pointer)) return null
-        val (x, y) = LineupDragDropRules.normalize(
-            pointer.x, pointer.y, pitch.left, pitch.top, pitch.width, pitch.height
+        val (x, y) = PitchOrientation.normalizePointer(
+            pointer.x, pointer.y, pitch.left, pitch.top, pitch.width, pitch.height, landscape
         )
+        val (acrossPx, alongPx) = PitchOrientation.lineupAxes(pitch.width, pitch.height, landscape)
         val existing = placementByPlayer[playerId]
             ?: MatchLineupPlacement(matchId = matchId, playerId = playerId)
         return SubstitutionPlanRules.resolveDrop(
             placementByPlayer + (playerId to existing), playerId, x, y, slots,
-            current.playersOnPitch, pitch.width, pitch.height, playerHitRadiusPx
+            current.playersOnPitch, acrossPx, alongPx, playerHitRadiusPx
         )
     }
 
@@ -180,139 +189,170 @@ fun LineupBuilderScreen(
     val hoveredSlotId = (dropPreview as? SubstitutionDrop.Place)?.drop?.takeIf { it.snapped }?.formationSlot
     val swapTargetId = (dropPreview as? SubstitutionDrop.Swap)?.targetPlayerId
 
-    Column(Modifier.fillMaxSize()) {
-        Box(
-            Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .onGloballyPositioned { editorOrigin = it.boundsInRoot().topLeft }
-        ) {
-            Column(Modifier.fillMaxSize()) {
-                PitchView(
-                    slots = slots,
-                    placements = onPitch,
-                    playersById = playersById,
-                    draggingPlayerId = dragState?.playerId,
-                    highlightedSlotId = hoveredSlotId,
-                    isDropTarget = pitchIsDropTarget,
-                    onBoundsChanged = { pitchBounds = it },
-                    onPlayerClick = ::openPlayer,
-                    onNudge = { playerId, dx, dy ->
-                        placementByPlayer[playerId]?.let { existing ->
-                            vm.setLineupPlacement(
-                                existing.copy(
-                                    normalizedX = (existing.normalizedX + dx).coerceIn(0.08f, 0.92f),
-                                    normalizedY = (existing.normalizedY + dy).coerceIn(0.08f, 0.92f),
-                                    formationSlot = ""
-                                )
-                            )
-                        }
-                    },
-                    onDragStart = { playerId, pointer ->
-                        dragState = LineupDragState(playerId, true, pointer)
-                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                    },
-                    onDragMove = { pointer ->
-                        dragState = dragState?.copy(pointerInRoot = pointer)
-                    },
-                    onDragEnd = ::finishDrag,
-                    onDragCancel = { dragState = null },
-                    highlightedPlayerId = swapTargetId,
-                    dropHint = swapTargetId?.let { "Swap with ${playersById[it]?.name ?: "player"}" },
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                        .padding(horizontal = 4.dp, vertical = 2.dp)
-                )
-
-                BenchPanel(
-                    players = bench,
-                    draggingPlayerId = dragState?.playerId,
-                    isDropTarget = benchIsDropTarget,
-                    onBoundsChanged = { benchBounds = it },
-                    onPlayerClick = ::openPlayer,
-                    onDragStart = { playerId, pointer ->
-                        dragState = LineupDragState(playerId, false, pointer)
-                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                    },
-                    onDragMove = { pointer ->
-                        dragState = dragState?.copy(pointerInRoot = pointer)
-                    },
-                    onDragEnd = ::finishDrag,
-                    onDragCancel = { dragState = null }
-                )
-            }
-
-            dragState?.let { drag ->
-                playersById[drag.playerId]?.let { player ->
-                    PlayerDragGhost(
-                        player = player,
-                        modifier = Modifier
-                            .offset {
-                                IntOffset(
-                                    (drag.pointerInRoot.x - editorOrigin.x - 29.dp.toPx()).roundToInt(),
-                                    (drag.pointerInRoot.y - editorOrigin.y - 29.dp.toPx()).roundToInt()
-                                )
-                            }
-                            .zIndex(20f)
+    val pitchView: @Composable (Modifier) -> Unit = { modifier ->
+        PitchView(
+            slots = slots,
+            placements = onPitch,
+            playersById = playersById,
+            draggingPlayerId = dragState?.playerId,
+            highlightedSlotId = hoveredSlotId,
+            isDropTarget = pitchIsDropTarget,
+            onBoundsChanged = { pitchBounds = it },
+            onPlayerClick = ::openPlayer,
+            onNudge = { playerId, dx, dy ->
+                placementByPlayer[playerId]?.let { existing ->
+                    vm.setLineupPlacement(
+                        existing.copy(
+                            normalizedX = (existing.normalizedX + dx).coerceIn(0.08f, 0.92f),
+                            normalizedY = (existing.normalizedY + dy).coerceIn(0.08f, 0.92f),
+                            formationSlot = ""
+                        )
                     )
+                }
+            },
+            onDragStart = { playerId, pointer ->
+                dragState = LineupDragState(playerId, true, pointer)
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+            },
+            onDragMove = { pointer ->
+                dragState = dragState?.copy(pointerInRoot = pointer)
+            },
+            onDragEnd = ::finishDrag,
+            onDragCancel = { dragState = null },
+            highlightedPlayerId = swapTargetId,
+            dropHint = swapTargetId?.let { "Swap with ${playersById[it]?.name ?: "player"}" },
+            horizontal = landscape,
+            modifier = modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+        )
+    }
+    val benchPanel: @Composable (Modifier) -> Unit = { modifier ->
+        BenchPanel(
+            players = bench,
+            draggingPlayerId = dragState?.playerId,
+            isDropTarget = benchIsDropTarget,
+            onBoundsChanged = { benchBounds = it },
+            onPlayerClick = ::openPlayer,
+            onDragStart = { playerId, pointer ->
+                dragState = LineupDragState(playerId, false, pointer)
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+            },
+            onDragMove = { pointer ->
+                dragState = dragState?.copy(pointerInRoot = pointer)
+            },
+            onDragEnd = ::finishDrag,
+            onDragCancel = { dragState = null },
+            vertical = landscape,
+            modifier = modifier
+        )
+    }
+    val summary: @Composable () -> Unit = {
+        Text(
+            "${onPitch.size}/${current.playersOnPitch} on pitch  •  vs ${current.opponent}  •  ${current.formation}",
+            color = if (onPitch.size == current.playersOnPitch) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
+    val autoPlaceButton: @Composable (Modifier) -> Unit = { modifier ->
+        AppOutlinedButton(
+            onClick = { showAutoPlaceConfirmation = true },
+            enabled = selectedPlayers.isNotEmpty() && dragState == null,
+            modifier = modifier
+        ) { Text("Auto-place", maxLines = 1) }
+    }
+    val squadButton: @Composable (Modifier) -> Unit = { modifier ->
+        AppOutlinedButton(
+            onClick = { nav.navigate("squad/$matchId") },
+            enabled = dragState == null,
+            modifier = modifier
+        ) { Text("Squad", maxLines = 1) }
+    }
+    val matchDayButton: @Composable (Modifier) -> Unit = { modifier ->
+        AppButton(
+            enabled = onPitch.isNotEmpty() && dragState == null,
+            onClick = {
+                if (onPitch.size < current.playersOnPitch) {
+                    showUnderfilledConfirmation = true
+                } else {
+                    vm.markLineupReady(matchId) {
+                        nav.navigate("ready/$matchId") {
+                            popUpTo("lineup/$matchId") { inclusive = true }
+                        }
+                    }
+                }
+            },
+            modifier = modifier
+        ) { Text("Match day", maxLines = 1) }
+    }
+
+    Box(
+        Modifier
+            .fillMaxSize()
+            .onGloballyPositioned { editorOrigin = it.boundsInRoot().topLeft }
+    ) {
+        if (landscape) {
+            // Held sideways: the pitch lies on its side and the bench and buttons sit beside it.
+            Row(Modifier.fillMaxSize()) {
+                pitchView(Modifier.weight(1f).fillMaxHeight())
+                Column(
+                    Modifier.width(212.dp).fillMaxHeight().padding(end = 6.dp, top = 2.dp, bottom = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    benchPanel(Modifier.weight(1f).fillMaxWidth())
+                    summary()
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        autoPlaceButton(Modifier.weight(1f))
+                        squadButton(Modifier.weight(1f))
+                    }
+                    matchDayButton(Modifier.fillMaxWidth())
+                }
+            }
+        } else Column(Modifier.fillMaxSize()) {
+            pitchView(Modifier.weight(1f).fillMaxWidth())
+            benchPanel(Modifier)
+            Surface(shadowElevation = 8.dp) {
+                Column(
+                    Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    summary()
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        autoPlaceButton(Modifier.weight(1f))
+                        squadButton(Modifier.weight(1f))
+                        matchDayButton(Modifier.weight(1.2f))
+                    }
                 }
             }
         }
 
-        Surface(shadowElevation = 8.dp) {
-            Column(
-                Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Text(
-                    "${onPitch.size}/${current.playersOnPitch} on pitch  •  vs ${current.opponent}  •  ${current.formation}",
-                    color = if (onPitch.size == current.playersOnPitch) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.align(Alignment.CenterHorizontally)
+        dragState?.let { drag ->
+            playersById[drag.playerId]?.let { player ->
+                PlayerDragGhost(
+                    player = player,
+                    modifier = Modifier
+                        .offset {
+                            IntOffset(
+                                (drag.pointerInRoot.x - editorOrigin.x - 29.dp.toPx()).roundToInt(),
+                                (drag.pointerInRoot.y - editorOrigin.y - 29.dp.toPx()).roundToInt()
+                            )
+                        }
+                        .zIndex(20f)
                 )
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    AppOutlinedButton(
-                        onClick = { showAutoPlaceConfirmation = true },
-                        enabled = selectedPlayers.isNotEmpty() && dragState == null,
-                        modifier = Modifier.weight(1f)
-                    ) { Text("Auto-place", maxLines = 1) }
-                    AppOutlinedButton(
-                        onClick = { nav.navigate("squad/$matchId") },
-                        enabled = dragState == null,
-                        modifier = Modifier.weight(1f)
-                    ) { Text("Squad", maxLines = 1) }
-                    AppButton(
-                        enabled = onPitch.isNotEmpty() && dragState == null,
-                        onClick = {
-                            if (onPitch.size < current.playersOnPitch) {
-                                showUnderfilledConfirmation = true
-                            } else {
-                                vm.markLineupReady(matchId) {
-                                    nav.navigate("ready/$matchId") {
-                                        popUpTo("lineup/$matchId") { inclusive = true }
-                                    }
-                                }
-                            }
-                        },
-                        modifier = Modifier.weight(1.2f)
-                    ) { Text("Match day", maxLines = 1) }
-                }
             }
         }
     }
-
 
     val selectedPlayer = playersById[selectedPlayerId]
     if (selectedPlayer != null && dragState == null) {
@@ -434,7 +474,9 @@ internal fun PitchView(
     modifier: Modifier = Modifier,
     subtitleFor: (Long) -> String? = { null },
     highlightedPlayerId: Long? = null,
-    dropHint: String? = null
+    dropHint: String? = null,
+    /** Lays the pitch on its side, our goal on the left, to fill a landscape screen. */
+    horizontal: Boolean = false
 ) {
     BoxWithConstraints(
         modifier = modifier
@@ -449,15 +491,16 @@ internal fun PitchView(
         val markerPx = with(density) { 54.dp.toPx() }
         val slotRadiusPx = with(density) { 13.dp.toPx() }
 
-        PitchLines(Modifier.fillMaxSize())
+        PitchLines(Modifier.fillMaxSize(), horizontal = horizontal)
 
         slots.forEach { slot ->
+            val (slotX, slotY) = PitchOrientation.toDisplay(slot.normalizedX, slot.normalizedY, horizontal)
             Box(
                 Modifier
                     .offset {
                         IntOffset(
-                            (slot.normalizedX * widthPx - slotRadiusPx).roundToInt(),
-                            (slot.normalizedY * heightPx - slotRadiusPx).roundToInt()
+                            (slotX * widthPx - slotRadiusPx).roundToInt(),
+                            (slotY * heightPx - slotRadiusPx).roundToInt()
                         )
                     }
                     .size(26.dp)
@@ -479,6 +522,9 @@ internal fun PitchView(
                 val markerHeightPx = with(density) {
                     (if (subtitleFor(player.id) != null) 84.dp else 68.dp).toPx()
                 }
+                val (shownX, shownY) = PitchOrientation.toDisplay(
+                    placement.normalizedX, placement.normalizedY, horizontal
+                )
                 PlayerMarker(
                     player = player,
                     role = placement.role,
@@ -494,9 +540,9 @@ internal fun PitchView(
                     modifier = Modifier
                         .offset {
                             IntOffset(
-                                (placement.normalizedX * widthPx - markerPx / 2)
+                                (shownX * widthPx - markerPx / 2)
                                     .coerceIn(0f, (widthPx - markerPx).coerceAtLeast(0f)).roundToInt(),
-                                (placement.normalizedY * heightPx - markerPx / 2)
+                                (shownY * heightPx - markerPx / 2)
                                     .coerceIn(0f, (heightPx - markerHeightPx).coerceAtLeast(0f)).roundToInt()
                             )
                         }
@@ -713,12 +759,16 @@ internal fun BenchPanel(
     subtitleFor: (Long) -> String? = { null },
     canDrag: (Long) -> Boolean = { true },
     /** Marks players who should get time on the pitch next. */
-    highlightFor: (Long) -> Boolean = { false }
+    highlightFor: (Long) -> Boolean = { false },
+    /** A column of substitutes beside the pitch, for landscape, instead of a row below it. */
+    vertical: Boolean = false,
+    modifier: Modifier = Modifier
 ) {
     Surface(
         color = if (isDropTarget) MaterialTheme.colorScheme.secondaryContainer
         else MaterialTheme.colorScheme.surfaceVariant,
-        modifier = Modifier
+        shape = if (vertical) RoundedCornerShape(12.dp) else RectangleShape,
+        modifier = modifier
             .testTag(LineupTestTags.BENCH)
             .onGloballyPositioned { onBoundsChanged(it.boundsInRoot()) }
     ) {
@@ -735,6 +785,21 @@ internal fun BenchPanel(
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                     style = MaterialTheme.typography.bodySmall
                 )
+            } else if (vertical) {
+                LazyVerticalGrid(
+                    columns = GridCells.Adaptive(60.dp),
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 3.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    items(players, key = { it.id }) { player ->
+                        BenchPlayer(
+                            player, draggingPlayerId, onPlayerClick, onDragStart, onDragMove, onDragEnd,
+                            onDragCancel, subtitleFor, canDrag, highlightFor
+                        )
+                    }
+                }
             } else {
                 LazyRow(
                     modifier = Modifier.fillMaxWidth(),
@@ -743,73 +808,92 @@ internal fun BenchPanel(
                     horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally)
                 ) {
                     items(players, key = { it.id }) { player ->
-                        Column(
-                            Modifier
-                                .testTag(LineupTestTags.benchPlayer(player.id))
-                                .width(60.dp)
-                                .alpha(
-                                    when {
-                                        draggingPlayerId == player.id -> 0.18f
-                                        !canDrag(player.id) -> 0.45f
-                                        else -> 1f
-                                    }
-                                )
-                                .then(
-                                    if (canDrag(player.id)) {
-                                        Modifier.longPressPlayerDrag(
-                                            playerId = player.id,
-                                            onStart = { onDragStart(player.id, it) },
-                                            onMove = onDragMove,
-                                            onEnd = { onDragEnd(player.id, it) },
-                                            onCancel = onDragCancel
-                                        )
-                                    } else Modifier
-                                )
-                                .semantics {
-                                    contentDescription =
-                                        "${player.name}, substitute. Tap for placement options or drag onto the pitch."
-                                    customActions = listOf(
-                                        CustomAccessibilityAction("Open placement options") {
-                                            onPlayerClick(player.id)
-                                            true
-                                        }
-                                    )
-                                }
-                                .clickable { onPlayerClick(player.id) },
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Box(
-                                Modifier.size(44.dp).clip(CircleShape)
-                                    .background(
-                                        if (highlightFor(player.id)) Color(0xFFFFC247)
-                                        else MaterialTheme.colorScheme.secondaryContainer
-                                    ),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    if (player.shirtNumber > 0) player.shirtNumber.toString()
-                                    else player.name.take(1).uppercase(),
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                            Text(
-                                player.name.substringBefore(" "),
-                                style = MaterialTheme.typography.labelSmall,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            subtitleFor(player.id)?.let {
-                                Text(
-                                    it,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = if (highlightFor(player.id)) FontWeight.Bold else null,
-                                    maxLines = 1
-                                )
-                            }
-                        }
+                        BenchPlayer(
+                            player, draggingPlayerId, onPlayerClick, onDragStart, onDragMove, onDragEnd,
+                            onDragCancel, subtitleFor, canDrag, highlightFor
+                        )
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun BenchPlayer(
+    player: Player,
+    draggingPlayerId: Long?,
+    onPlayerClick: (Long) -> Unit,
+    onDragStart: (Long, Offset) -> Unit,
+    onDragMove: (Offset) -> Unit,
+    onDragEnd: (Long, Offset) -> Unit,
+    onDragCancel: () -> Unit,
+    subtitleFor: (Long) -> String?,
+    canDrag: (Long) -> Boolean,
+    highlightFor: (Long) -> Boolean
+) {
+    Column(
+        Modifier
+            .testTag(LineupTestTags.benchPlayer(player.id))
+            .width(60.dp)
+            .alpha(
+                when {
+                    draggingPlayerId == player.id -> 0.18f
+                    !canDrag(player.id) -> 0.45f
+                    else -> 1f
+                }
+            )
+            .then(
+                if (canDrag(player.id)) {
+                    Modifier.longPressPlayerDrag(
+                        playerId = player.id,
+                        onStart = { onDragStart(player.id, it) },
+                        onMove = onDragMove,
+                        onEnd = { onDragEnd(player.id, it) },
+                        onCancel = onDragCancel
+                    )
+                } else Modifier
+            )
+            .semantics {
+                contentDescription =
+                    "${player.name}, substitute. Tap for placement options or drag onto the pitch."
+                customActions = listOf(
+                    CustomAccessibilityAction("Open placement options") {
+                        onPlayerClick(player.id)
+                        true
+                    }
+                )
+            }
+            .clickable { onPlayerClick(player.id) },
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            Modifier.size(44.dp).clip(CircleShape)
+                .background(
+                    if (highlightFor(player.id)) Color(0xFFFFC247)
+                    else MaterialTheme.colorScheme.secondaryContainer
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                if (player.shirtNumber > 0) player.shirtNumber.toString()
+                else player.name.take(1).uppercase(),
+                fontWeight = FontWeight.Bold
+            )
+        }
+        Text(
+            player.name.substringBefore(" "),
+            style = MaterialTheme.typography.labelSmall,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        subtitleFor(player.id)?.let {
+            Text(
+                it,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = if (highlightFor(player.id)) FontWeight.Bold else null,
+                maxLines = 1
+            )
         }
     }
 }

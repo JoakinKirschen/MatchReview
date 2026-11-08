@@ -20,10 +20,13 @@ import be.matchreview.app.domain.PlayerSeasonStats
 import be.matchreview.app.domain.StatAdjustments
 import be.matchreview.app.domain.StatLine
 import be.matchreview.app.domain.BackupReminderRules
+import be.matchreview.app.domain.PeriodResume
+import be.matchreview.app.recording.MatchRecordingService
 import be.matchreview.app.ui.ThemeMode
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -35,6 +38,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = matchReviewApplication.repository
     private val backupManager = matchReviewApplication.backupManager
     private val liveCommandGate = LiveCommandGate()
+    private val periodRecording = matchReviewApplication.periodRecording
 
     private val _backupOperation = MutableStateFlow<BackupOperationState>(BackupOperationState.Idle)
     val backupOperation: StateFlow<BackupOperationState> = _backupOperation.asStateFlow()
@@ -415,15 +419,44 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         repository.resumeMatchClock(matchId, now, System.currentTimeMillis())
     }
 
+    /** Whether the camera stops at each period end and restarts with the next period. */
+    val recordingFollowsPeriods: StateFlow<Boolean> = periodRecording.enabled
+    /** A recording stopped at a period end that restarts when the next period starts. */
+    val pendingPeriodRecording: StateFlow<PeriodResume?> = periodRecording.pending
+
+    fun setRecordingFollowsPeriods(enabled: Boolean) = periodRecording.setEnabled(enabled)
+
     fun endCurrentPeriod(matchId: Long) = viewModelScope.launch {
+        val stopCamera = periodRecording.prepareForPeriodEnd(matchId)
         repository.endCurrentPeriod(matchId, SystemClock.elapsedRealtime(), System.currentTimeMillis())
+        if (!stopCamera) return@launch
+        val ended = repository.match(matchId).first()
+        if (ended?.status == MatchStatus.PERIOD_ENDED) {
+            // The clip ends exactly at the period end; the break is not filmed.
+            MatchRecordingService.requestStop(getApplication(), ended.accumulatedMatchTimeMs)
+        } else {
+            periodRecording.cancel(matchId)
+        }
     }
 
     fun startNextPeriod(matchId: Long) = viewModelScope.launch {
-        repository.startNextPeriod(matchId, SystemClock.elapsedRealtime(), System.currentTimeMillis())
+        val startedAt = SystemClock.elapsedRealtime()
+        repository.startNextPeriod(matchId, startedAt, System.currentTimeMillis())
+        val started = repository.match(matchId).first()
+        // Runs in the application scope: waiting for the previous clip to be saved must
+        // not be cut short when the live screen closes.
+        matchReviewApplication.applicationScope.launch {
+            periodRecording.resumeAfterPeriodStart(
+                matchId = matchId,
+                status = started?.status,
+                periodStartMatchMs = started?.accumulatedMatchTimeMs ?: 0L,
+                periodStartedMonotonicMs = startedAt
+            )
+        }
     }
 
     fun finishLiveMatch(matchId: Long, done: () -> Unit = {}) = viewModelScope.launch {
+        periodRecording.cancel(matchId)
         val finishedAt = System.currentTimeMillis()
         repository.finishLiveMatch(matchId, SystemClock.elapsedRealtime(), finishedAt)
         backupPreferences.edit().putLong("last_finished_match_epoch_ms", finishedAt).apply()

@@ -4,6 +4,7 @@ import be.matchreview.app.ui.AppCard
 import be.matchreview.app.ui.AppButton
 import be.matchreview.app.ui.AppOutlinedButton
 import be.matchreview.app.ui.AppTonalButton
+import be.matchreview.app.ui.isLandscape
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -52,6 +53,7 @@ import be.matchreview.app.domain.MatchExportFormatter
 import be.matchreview.app.domain.MatchStatsRules
 import be.matchreview.app.domain.HighlightClip
 import be.matchreview.app.domain.HighlightRules
+import be.matchreview.app.domain.MatchVideoRules
 import be.matchreview.app.recording.HighlightReel
 import be.matchreview.app.recording.HighlightReelMaker
 import be.matchreview.app.domain.SeasonReportRules
@@ -165,6 +167,19 @@ fun MatchReviewApp(
         route == "backup" -> "Backup & restore"
         else -> "MatchReview"
     }
+    val landscape = isLandscape()
+    val topLevelItems = listOf(
+        Triple("home", R.string.nav_home, Icons.Default.Home),
+        Triple("teams", R.string.nav_teams, Icons.Default.Groups),
+        Triple("matches", R.string.nav_matches, Icons.Default.SportsSoccer)
+    )
+    fun openTopLevel(itemRoute: String) {
+        nav.navigate(itemRoute) {
+            popUpTo(nav.graph.findStartDestination().id) { saveState = true }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
     Scaffold(
         topBar = {
             if (!immersiveMatchDay) {
@@ -189,23 +204,13 @@ fun MatchReviewApp(
             }
         },
         bottomBar = {
-            if (!immersiveMatchDay && isTopLevel) {
+            if (!immersiveMatchDay && isTopLevel && !landscape) {
                 NavigationBar {
-                    listOf(
-                        Triple("home", R.string.nav_home, Icons.Default.Home),
-                        Triple("teams", R.string.nav_teams, Icons.Default.Groups),
-                        Triple("matches", R.string.nav_matches, Icons.Default.SportsSoccer)
-                    ).forEach { (itemRoute, labelResource, icon) ->
+                    topLevelItems.forEach { (itemRoute, labelResource, icon) ->
                         val label = stringResource(labelResource)
                         NavigationBarItem(
                             selected = route == itemRoute,
-                            onClick = {
-                                nav.navigate(itemRoute) {
-                                    popUpTo(nav.graph.findStartDestination().id) { saveState = true }
-                                    launchSingleTop = true
-                                    restoreState = true
-                                }
-                            },
+                            onClick = { openTopLevel(itemRoute) },
                             icon = { Icon(icon, contentDescription = label) },
                             label = { Text(label) }
                         )
@@ -214,30 +219,46 @@ fun MatchReviewApp(
             }
         }
     ) { padding ->
-        NavHost(navController = nav, startDestination = "home", modifier = Modifier.padding(padding)) {
-            composable("home") { DashboardScreen(vm, nav) }
-            composable("teams") { TeamsScreen(vm, nav) }
-            composable("team/new") { NewTeamScreen(vm, nav) }
-            composable("team/{id}") { entry ->
-                TeamScreen(entry.arguments?.getString("id")!!.toLong(), vm, nav)
+        Row(Modifier.fillMaxSize().padding(padding)) {
+            // Held sideways, the sections move to a rail on the left so the screens keep their height.
+            if (!immersiveMatchDay && isTopLevel && landscape) {
+                NavigationRail {
+                    topLevelItems.forEach { (itemRoute, labelResource, icon) ->
+                        val label = stringResource(labelResource)
+                        NavigationRailItem(
+                            selected = route == itemRoute,
+                            onClick = { openTopLevel(itemRoute) },
+                            icon = { Icon(icon, contentDescription = label) },
+                            label = { Text(label) }
+                        )
+                    }
+                }
             }
-            composable("matches") { MatchesScreen(vm, nav) }
-            composable("backup") { BackupRestoreScreen(vm) }
-            composable("match/new") { NewMatchScreen(vm, nav) }
-            composable("squad/{id}") { entry ->
-                SquadSelectionScreen(entry.arguments?.getString("id")!!.toLong(), vm, nav)
-            }
-            composable("lineup/{id}") { entry ->
-                LineupBuilderScreen(entry.arguments?.getString("id")!!.toLong(), vm, nav)
-            }
-            composable("ready/{id}") { entry ->
-                MatchReadinessScreen(entry.arguments?.getString("id")!!.toLong(), vm, nav)
-            }
-            composable("live/{id}") { entry ->
-                LiveMatchScreen(entry.arguments?.getString("id")!!.toLong(), vm, nav)
-            }
-            composable("review/{id}") { entry ->
-                ReviewScreen(entry.arguments?.getString("id")!!.toLong(), vm, nav)
+            NavHost(navController = nav, startDestination = "home", modifier = Modifier.weight(1f).fillMaxHeight()) {
+                composable("home") { DashboardScreen(vm, nav) }
+                composable("teams") { TeamsScreen(vm, nav) }
+                composable("team/new") { NewTeamScreen(vm, nav) }
+                composable("team/{id}") { entry ->
+                    TeamScreen(entry.arguments?.getString("id")!!.toLong(), vm, nav)
+                }
+                composable("matches") { MatchesScreen(vm, nav) }
+                composable("backup") { BackupRestoreScreen(vm) }
+                composable("match/new") { NewMatchScreen(vm, nav) }
+                composable("squad/{id}") { entry ->
+                    SquadSelectionScreen(entry.arguments?.getString("id")!!.toLong(), vm, nav)
+                }
+                composable("lineup/{id}") { entry ->
+                    LineupBuilderScreen(entry.arguments?.getString("id")!!.toLong(), vm, nav)
+                }
+                composable("ready/{id}") { entry ->
+                    MatchReadinessScreen(entry.arguments?.getString("id")!!.toLong(), vm, nav)
+                }
+                composable("live/{id}") { entry ->
+                    LiveMatchScreen(entry.arguments?.getString("id")!!.toLong(), vm, nav)
+                }
+                composable("review/{id}") { entry ->
+                    ReviewScreen(entry.arguments?.getString("id")!!.toLong(), vm, nav)
+                }
             }
         }
         // Only after NavHost has set up its graph; navigating earlier throws.
@@ -1770,10 +1791,12 @@ private fun ReviewScreen(matchId: Long, vm: MainViewModel, nav: NavHostControlle
     val participations by vm.participations(matchId).collectAsStateWithLifecycle(initialValue = emptyList())
     val lineup by vm.lineup(matchId).collectAsStateWithLifecycle(initialValue = emptyList())
     val recordings by vm.recordings(matchId).collectAsStateWithLifecycle(initialValue = emptyList())
+    val periods by vm.periods(matchId).collectAsStateWithLifecycle(initialValue = emptyList())
     val allPlayers by vm.players.collectAsStateWithLifecycle()
     val teams by vm.teams.collectAsStateWithLifecycle()
     val backupDue by vm.backupDue.collectAsStateWithLifecycle()
     var showDetailsEditor by remember { mutableStateOf(false) }
+    var showFullVideo by rememberSaveable { mutableStateOf(false) }
     var goalPositionEvent by remember { mutableStateOf<MatchEvent?>(null) }
     val current = match ?: return Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
     val teamPlayers = allPlayers.filter { it.teamId == current.teamId }
@@ -1967,6 +1990,28 @@ private fun ReviewScreen(matchId: Long, vm: MainViewModel, nav: NavHostControlle
         }
 
         if (reviewSection == ReviewSection.VIDEO) {
+        val matchClips = remember(recordings, periods) { MatchVideoRules.clips(recordings, periods) }
+        AppCard(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("Match recording", style = MaterialTheme.typography.titleMedium)
+                if (matchClips.isEmpty()) {
+                    Text(
+                        "Record the match with the camera in the live screen to watch it here.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                } else {
+                    Text(
+                        "${matchClips.size} clip(s) • ${formatTime(MatchVideoRules.totalDurationMs(matchClips))}. " +
+                            "Plays all clips one after another; jump to any period or event.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    AppButton(
+                        onClick = { showFullVideo = true },
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                    ) { Text("Watch full match") }
+                }
+            }
+        }
         if (player != null) {
             AndroidView(
                 factory = { ctx ->
@@ -2333,6 +2378,18 @@ private fun ReviewScreen(matchId: Long, vm: MainViewModel, nav: NavHostControlle
                 vm.setGoalPlacement(event.id, x, y)
                 goalPositionEvent = null
             }
+        )
+    }
+
+    if (showFullVideo) {
+        MatchVideoDialog(
+            title = if (current.isHome) "${team?.name ?: "Home"} vs ${current.opponent}"
+            else "${current.opponent} vs ${team?.name ?: "Away"}",
+            recordings = recordings,
+            periods = periods,
+            events = events,
+            playersById = allPlayers.associateBy { it.id },
+            onDismiss = { showFullVideo = false }
         )
     }
 

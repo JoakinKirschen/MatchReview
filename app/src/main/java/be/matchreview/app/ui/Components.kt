@@ -98,3 +98,13 @@ fun AppCard(
     colors = colors,
     content = content
 )
+
+/**
+ * True when the screen is wider than it is tall, such as a phone held sideways. Screens
+ * then place their parts side by side instead of stacking them into thin strips.
+ */
+@Composable
+fun isLandscape(): Boolean {
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    return configuration.screenWidthDp > configuration.screenHeightDp
+}

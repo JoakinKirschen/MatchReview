@@ -7,6 +7,9 @@ import be.matchreview.app.ui.AppButtons
 import be.matchreview.app.ui.AppButton
 import be.matchreview.app.ui.AppOutlinedButton
 import be.matchreview.app.ui.AppTonalButton
+import be.matchreview.app.ui.isLandscape
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
@@ -60,6 +63,7 @@ import be.matchreview.app.domain.MatchActions
 import be.matchreview.app.domain.MatchStats
 import be.matchreview.app.domain.MatchStatsRules
 import be.matchreview.app.domain.PeriodTimeRules
+import be.matchreview.app.domain.PitchOrientation
 import androidx.compose.runtime.saveable.rememberSaveable
 import be.matchreview.app.domain.TimelineGrouping
 import be.matchreview.app.domain.TimelineItem
@@ -115,6 +119,8 @@ fun LiveMatchScreen(
     val context = LocalContext.current
     val cameraState by CameraRecordingController.state.collectAsStateWithLifecycle()
     val recordingThisMatch = cameraState.activeMatchId == matchId
+    val pendingPeriodResume by vm.pendingPeriodRecording.collectAsStateWithLifecycle()
+    val recordingFollowsPeriods by vm.recordingFollowsPeriods.collectAsStateWithLifecycle()
     DisposableEffect(current.status) {
         val previous = view.keepScreenOn
         view.keepScreenOn = current.status in setOf(
@@ -213,7 +219,8 @@ fun LiveMatchScreen(
                     .coerceAtLeast(0L)
             }
 
-    var tab by remember { mutableStateOf(LiveTab.MATCH) }
+    // Saved, so turning the phone keeps the camera or timeline open.
+    var tab by rememberSaveable { mutableStateOf(LiveTab.MATCH) }
     var selectedPlayerId by remember { mutableStateOf<Long?>(null) }
     var removalPlayerId by remember { mutableStateOf<Long?>(null) }
     var scorerSelectionOpen by remember { mutableStateOf(false) }
@@ -228,6 +235,7 @@ fun LiveMatchScreen(
     var showFinishConfirmation by remember { mutableStateOf(false) }
     var showLeaveConfirmation by remember { mutableStateOf(false) }
     var selectedVideoEvent by remember { mutableStateOf<MatchEvent?>(null) }
+    var showFullVideo by remember { mutableStateOf(false) }
     var pendingGoalDeletion by remember { mutableStateOf<MatchEvent?>(null) }
     var pendingQuickGoalEditId by remember { mutableStateOf<Long?>(null) }
     /** A quick goal waiting for its scorer (scorerChosen = false) or its assist. */
@@ -378,74 +386,333 @@ fun LiveMatchScreen(
     BackHandler(enabled = substitutionMode) { leaveSubstitutionMode() }
     LaunchedEffect(liveActionsEnabled) { if (!liveActionsEnabled && substitutionMode) leaveSubstitutionMode() }
 
+    val landscape = isLandscape()
+
+    val liveHeader: @Composable () -> Unit = {
+        Row(
+            Modifier.fillMaxWidth().height(50.dp).padding(horizontal = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            TextButton(onClick = { showLeaveConfirmation = true }) { Text("Back") }
+            Column(
+                Modifier.weight(1f),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    "vs ${current.opponent}",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(statusLabel(current), style = MaterialTheme.typography.labelSmall)
+            }
+            // Rare corrections live in a menu so they are not tapped by accident.
+            Box {
+                IconButton(onClick = { showMatchMenu = true }) {
+                    Icon(Icons.Default.MoreVert, contentDescription = "More match options")
+                }
+                DropdownMenu(expanded = showMatchMenu, onDismissRequest = { showMatchMenu = false }) {
+                    DropdownMenuItem(
+                        text = { Text("Correct score") },
+                        onClick = {
+                            showMatchMenu = false
+                            showScoreCorrection = true
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Edit match details") },
+                        onClick = {
+                            showMatchMenu = false
+                            showDetailsEditor = true
+                        }
+                    )
+                }
+            }
+        }
+    }
+
+    val liveTabs: @Composable () -> Unit = {
+        CompactLiveTabs(
+            selected = tab,
+            onSelected = { tab = it }
+        )
+    }
+
+    val controlBar: @Composable () -> Unit = {
+        LiveControlBar(
+            match = current,
+            actionEnabled = !liveActionLocked,
+            onKickOff = {
+                askForNotifications()
+                runLiveAction { vm.kickOffMatch(matchId) }
+            },
+            onPause = { runLiveAction { vm.pauseMatchClock(matchId) } },
+            onResume = { runLiveAction { vm.resumeMatchClock(matchId) } },
+            onEndPeriod = { showEndPeriodConfirmation = true },
+            onNextPeriod = { runLiveAction { vm.startNextPeriod(matchId) } },
+            onFinish = { showFinishConfirmation = true }
+        )
+    }
+
+    /** Scoreboard and the notices that belong with it. */
+    val statusSection: @Composable () -> Unit = {
+        LiveScoreboard(
+            match = current,
+            teamName = teamName,
+            matchTimeMs = matchTimeMs,
+            periodTimeMs = periodTimeMs,
+            plannedPeriodMs = plannedPeriodMs
+        )
+
+        if (periodTimeUp) {
+            Surface(
+                color = Color(0xFFFFC247),
+                contentColor = Color(0xFF1B1B1F),
+                shape = MaterialTheme.shapes.small,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    Modifier.padding(start = 12.dp, end = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "Period time reached • +${MatchClockCalculator.formatClock(
+                            PeriodTimeRules.overtimeMs(periodTimeMs, plannedPeriodMs)
+                        )}",
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.weight(1f)
+                    )
+                    TextButton(
+                        onClick = { showEndPeriodConfirmation = true },
+                        colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFF1B1B1F)),
+                        modifier = Modifier.heightIn(min = 48.dp)
+                    ) { Text("End period", fontWeight = FontWeight.Bold) }
+                }
+            }
+        }
+
+        RecordingStatusChip(
+            state = cameraState,
+            matchId = matchId,
+            restartsWithPeriod = pendingPeriodResume?.matchId == matchId &&
+                current.status == MatchStatus.PERIOD_ENDED &&
+                current.currentPeriod < current.periodCount,
+            nextPeriod = current.currentPeriod + 1,
+            onClick = { tab = LiveTab.CAMERA }
+        )
+
+        if (clockRecovery?.confidence == ClockRecoveryConfidence.NEEDS_CONFIRMATION) {
+            Surface(
+                color = MaterialTheme.colorScheme.errorContainer,
+                shape = MaterialTheme.shapes.small,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    "Check the match clock: ${clockRecovery.explanation}",
+                    modifier = Modifier.padding(10.dp),
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+        }
+    }
+
+    // The quick actions; in landscape they wrap onto two rows in the narrower side panel.
+    val ourGoalButton: @Composable (Modifier) -> Unit = { modifier ->
+        AppButton(
+            onClick = ::recordQuickGoal,
+            enabled = !liveActionLocked,
+            contentPadding = PaddingValues(horizontal = 6.dp),
+            modifier = modifier.heightIn(min = AppButtons.LargeHeight)
+        ) { Text(stringResource(R.string.our_goal), maxLines = 1, overflow = TextOverflow.Ellipsis) }
+    }
+    val theirGoalButton: @Composable (Modifier) -> Unit = { modifier ->
+        AppOutlinedButton(
+            onClick = { showOpponentGoalConfirmation = true },
+            enabled = !liveActionLocked,
+            contentPadding = PaddingValues(horizontal = 6.dp),
+            modifier = modifier.heightIn(min = AppButtons.LargeHeight)
+        ) { Text(stringResource(R.string.their_goal), maxLines = 1, overflow = TextOverflow.Ellipsis) }
+    }
+    val saveButton: @Composable (Modifier) -> Unit = { modifier ->
+        AppTonalButton(
+            onClick = ::startSave,
+            enabled = !liveActionLocked,
+            contentPadding = PaddingValues(horizontal = 6.dp),
+            modifier = modifier.heightIn(min = AppButtons.LargeHeight)
+        ) {
+            val saves = events.count { it.type == "KEEPER_SAVE" }
+            Text(
+                if (saves > 0) "${stringResource(R.string.keeper_save)} $saves"
+                else stringResource(R.string.keeper_save),
+                maxLines = 1
+            )
+        }
+    }
+    val undoButton: @Composable (Modifier) -> Unit = { modifier ->
+        AppOutlinedButton(
+            onClick = {
+                runLiveAction { vm.undoLatestScoreAction(matchId) }
+                scope.launch { snackbarHostState.showSnackbar("Latest score action undone") }
+            },
+            enabled = !liveActionLocked &&
+                events.any { it.type == "OUR_GOAL" || it.type == "OPPONENT_GOAL" },
+            contentPadding = PaddingValues(horizontal = 6.dp),
+            modifier = modifier.heightIn(min = AppButtons.LargeHeight)
+        ) { Text(stringResource(R.string.undo)) }
+    }
+    val moreActionsButton: @Composable (Modifier) -> Unit = { modifier ->
+        AppOutlinedButton(
+            onClick = { actionsSheetOpen = true },
+            enabled = !liveActionLocked,
+            contentPadding = PaddingValues(horizontal = 4.dp),
+            modifier = modifier.widthIn(min = 48.dp).heightIn(min = AppButtons.LargeHeight)
+                .semantics { contentDescription = "Shots, corners and cards" }
+        ) { Text("⋯", fontWeight = FontWeight.Black) }
+    }
+
+    val substitutesHeader: @Composable () -> Unit = {
+        Row(
+            Modifier.fillMaxWidth().height(28.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                "Subs • ${onPitch.size}/${current.playersOnPitch} on pitch • ${eligibleBenchIds.size} available",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+            TextButton(
+                onClick = ::enterSubstitutionMode,
+                enabled = liveActionsEnabled && placements.isNotEmpty(),
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+            ) { Text("Substitution mode") }
+        }
+    }
+
+    val leastPlayedBench = PlayingTimeRules.leastPlayed(eligibleBenchIds, ::playedMs)
+    val sortedBench = bench.sortedWith(
+        compareBy<MatchLineupPlacement>({ it.playerId !in eligibleBenchIds }, { playedMs(it.playerId) })
+    )
+    val benchCard: @Composable (MatchLineupPlacement, Modifier) -> Unit = { placement, modifier ->
+        playersById[placement.playerId]?.let { player ->
+            val state = squadById[player.id]?.state
+            BenchMinuteCard(
+                player = player,
+                minutes = MatchClockCalculator.displayedWholeMinutes(playedMs(player.id)),
+                enabled = state !in setOf(
+                    PlayerMatchState.REMOVED,
+                    PlayerMatchState.DISMISSED,
+                    PlayerMatchState.UNAVAILABLE
+                ),
+                stateLabel = when (state) {
+                    PlayerMatchState.REMOVED -> "Out"
+                    PlayerMatchState.DISMISSED -> "Sent off"
+                    else -> null
+                },
+                highlighted = player.id in leastPlayedBench,
+                onClick = { selectedPlayerId = player.id },
+                modifier = modifier
+            )
+        }
+    }
+
+    val livePitch: @Composable (Modifier) -> Unit = { modifier ->
+        LivePitch(
+            placements = onPitch,
+            playersById = playersById,
+            minutesFor = { playedMs(it) },
+            onPlayerClick = { selectedPlayerId = it },
+            horizontal = landscape,
+            modifier = modifier
+        )
+    }
+
+    val tabContent: @Composable ColumnScope.() -> Unit = {
+        when (tab) {
+            LiveTab.MATCH -> if (landscape) {
+                substitutesHeader()
+                // The pitch lies on its side, the substitutes in a column beside it.
+                Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    livePitch(Modifier.weight(1f).fillMaxHeight())
+                    LazyColumn(
+                        modifier = Modifier.width(80.dp).fillMaxHeight(),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        items(sortedBench, key = { it.playerId }) { placement ->
+                            benchCard(placement, Modifier.fillMaxWidth().height(64.dp))
+                        }
+                    }
+                }
+            } else {
+                livePitch(Modifier.weight(1f).fillMaxWidth())
+                substitutesHeader()
+                LazyRow(
+                    modifier = Modifier.fillMaxWidth().height(64.dp),
+                    contentPadding = PaddingValues(horizontal = 2.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally)
+                ) {
+                    items(sortedBench, key = { it.playerId }) { placement ->
+                        benchCard(placement, Modifier.width(78.dp).fillMaxHeight())
+                    }
+                }
+            }
+            LiveTab.CAMERA -> CameraMatchPanel(
+                matchId = matchId,
+                matchClockMs = matchTimeMs,
+                recordings = recordings,
+                followPeriods = recordingFollowsPeriods,
+                onFollowPeriodsChange = vm::setRecordingFollowsPeriods,
+                onWatchVideo = { showFullVideo = true },
+                modifier = Modifier.weight(1f).fillMaxWidth()
+            )
+            LiveTab.TIMELINE -> MatchTimeline(
+                // Tags on an imported video use video positions, not match time.
+                events = events.filterNot(be.matchreview.app.domain.VideoEventRules::isImportedVideoTag).sortedWith(
+                    compareByDescending<MatchEvent> { it.timestampMs }.thenByDescending { it.id }
+                ),
+                playersById = playersById,
+                recordings = recordings,
+                modifier = Modifier.weight(1f),
+                onPlayEvent = { selectedVideoEvent = it },
+                onEditGoal = { editGoal = it },
+                onEditGoalPosition = { event ->
+                    goalPlacement = GoalPlacementRequest(
+                        eventId = event.id,
+                        title = if (event.type == "OPPONENT_GOAL") "Where did ${current.opponent} score?"
+                        else "Where did $teamName score?",
+                        initialX = event.goalX,
+                        initialY = event.goalY
+                    )
+                },
+                onDeleteGoal = { pendingGoalDeletion = it },
+                onDeleteEvent = { pendingEventDeletion = it },
+                undoableRoundId = undoableRoundId,
+                onUndoRound = { showUndoRoundConfirmation = true }
+            )
+        }
+    }
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            // Substitution mode gives the whole screen to the pitch and bench.
-            if (!substitutionMode) Surface(shadowElevation = 3.dp, color = MaterialTheme.colorScheme.surfaceContainerLowest) {
-                Row(
-                    Modifier.fillMaxWidth().height(50.dp).padding(horizontal = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    TextButton(onClick = { showLeaveConfirmation = true }) { Text("Back") }
-                    Column(
-                        Modifier.weight(1f),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            "vs ${current.opponent}",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Text(statusLabel(current), style = MaterialTheme.typography.labelSmall)
-                    }
-                    // Rare corrections live in a menu so they are not tapped by accident.
-                    Box {
-                        IconButton(onClick = { showMatchMenu = true }) {
-                            Icon(Icons.Default.MoreVert, contentDescription = "More match options")
-                        }
-                        DropdownMenu(expanded = showMatchMenu, onDismissRequest = { showMatchMenu = false }) {
-                            DropdownMenuItem(
-                                text = { Text("Correct score") },
-                                onClick = {
-                                    showMatchMenu = false
-                                    showScoreCorrection = true
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Edit match details") },
-                                onClick = {
-                                    showMatchMenu = false
-                                    showDetailsEditor = true
-                                }
-                            )
-                        }
-                    }
+            // Substitution mode gives the whole screen to the pitch and bench. In landscape
+            // the header moves into the side panel to leave the height for the content.
+            if (!substitutionMode && !landscape) {
+                Surface(shadowElevation = 3.dp, color = MaterialTheme.colorScheme.surfaceContainerLowest) {
+                    liveHeader()
                 }
             }
         },
         bottomBar = {
-            if (!substitutionMode) Surface(shadowElevation = 10.dp, color = MaterialTheme.colorScheme.surfaceContainerLowest) {
-                Column(Modifier.navigationBarsPadding()) {
-                    CompactLiveTabs(
-                        selected = tab,
-                        onSelected = { tab = it }
-                    )
-                    LiveControlBar(
-                        match = current,
-                        actionEnabled = !liveActionLocked,
-                        onKickOff = {
-                            askForNotifications()
-                            runLiveAction { vm.kickOffMatch(matchId) }
-                        },
-                        onPause = { runLiveAction { vm.pauseMatchClock(matchId) } },
-                        onResume = { runLiveAction { vm.resumeMatchClock(matchId) } },
-                        onEndPeriod = { showEndPeriodConfirmation = true },
-                        onNextPeriod = { runLiveAction { vm.startNextPeriod(matchId) } },
-                        onFinish = { showFinishConfirmation = true }
-                    )
+            if (!substitutionMode && !landscape) {
+                Surface(shadowElevation = 10.dp, color = MaterialTheme.colorScheme.surfaceContainerLowest) {
+                    Column(Modifier.navigationBarsPadding()) {
+                        liveTabs()
+                        controlBar()
+                    }
                 }
             }
         }
@@ -492,6 +759,46 @@ fun LiveMatchScreen(
                 },
                 modifier = Modifier.fillMaxSize().padding(padding)
             )
+        } else if (landscape) {
+            // Held sideways: score, quick actions and the clock buttons on the left, the
+            // pitch, camera or timeline filling the rest of the screen on the right.
+            Row(
+                Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(horizontal = 4.dp, vertical = 3.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Column(
+                    Modifier
+                        .width(320.dp)
+                        .fillMaxHeight()
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    liveHeader()
+                    statusSection()
+                    if (liveActionsEnabled) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            ourGoalButton(Modifier.weight(1f))
+                            theirGoalButton(Modifier.weight(1f))
+                        }
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            saveButton(Modifier.weight(1f))
+                            undoButton(Modifier)
+                            moreActionsButton(Modifier)
+                        }
+                    }
+                    controlBar()
+                }
+                Column(
+                    Modifier.weight(1f).fillMaxHeight(),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    liveTabs()
+                    tabContent()
+                }
+            }
         } else Column(
             Modifier
                 .fillMaxSize()
@@ -499,205 +806,34 @@ fun LiveMatchScreen(
                 .padding(horizontal = 4.dp, vertical = 3.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            LiveScoreboard(
-                match = current,
-                teamName = teamName,
-                matchTimeMs = matchTimeMs,
-                periodTimeMs = periodTimeMs,
-                plannedPeriodMs = plannedPeriodMs
-            )
-
-            if (periodTimeUp) {
-                Surface(
-                    color = Color(0xFFFFC247),
-                    contentColor = Color(0xFF1B1B1F),
-                    shape = MaterialTheme.shapes.small,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        Modifier.padding(start = 12.dp, end = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            "Period time reached • +${MatchClockCalculator.formatClock(
-                                PeriodTimeRules.overtimeMs(periodTimeMs, plannedPeriodMs)
-                            )}",
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.weight(1f)
-                        )
-                        TextButton(
-                            onClick = { showEndPeriodConfirmation = true },
-                            colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFF1B1B1F)),
-                            modifier = Modifier.heightIn(min = 48.dp)
-                        ) { Text("End period", fontWeight = FontWeight.Bold) }
-                    }
-                }
-            }
-
-            RecordingStatusChip(
-                state = cameraState,
-                matchId = matchId,
-                onClick = { tab = LiveTab.CAMERA }
-            )
-
-            if (clockRecovery?.confidence == ClockRecoveryConfidence.NEEDS_CONFIRMATION) {
-                Surface(
-                    color = MaterialTheme.colorScheme.errorContainer,
-                    shape = MaterialTheme.shapes.small,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(
-                        "Check the match clock: ${clockRecovery.explanation}",
-                        modifier = Modifier.padding(10.dp),
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
-            }
+            statusSection()
 
             if (liveActionsEnabled) {
                 Row(
                     Modifier.fillMaxWidth().heightIn(min = 56.dp),
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    AppButton(
-                        onClick = ::recordQuickGoal,
-                        enabled = !liveActionLocked,
-                        contentPadding = PaddingValues(horizontal = 6.dp),
-                        modifier = Modifier.weight(1f).heightIn(min = AppButtons.LargeHeight)
-                    ) { Text(stringResource(R.string.our_goal), maxLines = 1, overflow = TextOverflow.Ellipsis) }
-                    AppOutlinedButton(
-                        onClick = { showOpponentGoalConfirmation = true },
-                        enabled = !liveActionLocked,
-                        contentPadding = PaddingValues(horizontal = 6.dp),
-                        modifier = Modifier.weight(1f).heightIn(min = AppButtons.LargeHeight)
-                    ) { Text(stringResource(R.string.their_goal), maxLines = 1, overflow = TextOverflow.Ellipsis) }
-                    AppTonalButton(
-                        onClick = ::startSave,
-                        enabled = !liveActionLocked,
-                        contentPadding = PaddingValues(horizontal = 6.dp),
-                        modifier = Modifier.weight(0.75f).heightIn(min = AppButtons.LargeHeight)
-                    ) {
-                        val saves = events.count { it.type == "KEEPER_SAVE" }
-                        Text(
-                            if (saves > 0) "${stringResource(R.string.keeper_save)} $saves"
-                            else stringResource(R.string.keeper_save),
-                            maxLines = 1
-                        )
-                    }
-                    AppOutlinedButton(
-                        onClick = {
-                            runLiveAction { vm.undoLatestScoreAction(matchId) }
-                            scope.launch { snackbarHostState.showSnackbar("Latest score action undone") }
-                        },
-                        enabled = !liveActionLocked &&
-                            events.any { it.type == "OUR_GOAL" || it.type == "OPPONENT_GOAL" },
-                        contentPadding = PaddingValues(horizontal = 6.dp),
-                        modifier = Modifier.heightIn(min = AppButtons.LargeHeight)
-                    ) { Text(stringResource(R.string.undo)) }
-                    AppOutlinedButton(
-                        onClick = { actionsSheetOpen = true },
-                        enabled = !liveActionLocked,
-                        contentPadding = PaddingValues(horizontal = 4.dp),
-                        modifier = Modifier.widthIn(min = 48.dp).heightIn(min = AppButtons.LargeHeight)
-                            .semantics { contentDescription = "Shots, corners and cards" }
-                    ) { Text("⋯", fontWeight = FontWeight.Black) }
+                    ourGoalButton(Modifier.weight(1f))
+                    theirGoalButton(Modifier.weight(1f))
+                    saveButton(Modifier.weight(0.75f))
+                    undoButton(Modifier)
+                    moreActionsButton(Modifier)
                 }
             }
 
-            if (tab == LiveTab.MATCH) {
-                LivePitch(
-                    placements = onPitch,
-                    playersById = playersById,
-                    minutesFor = { playedMs(it) },
-                    onPlayerClick = { selectedPlayerId = it },
-                    modifier = Modifier.weight(1f).fillMaxWidth()
-                )
-
-                Row(
-                    Modifier.fillMaxWidth().height(28.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        "Subs • ${onPitch.size}/${current.playersOnPitch} on pitch • ${eligibleBenchIds.size} available",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        modifier = Modifier.weight(1f)
-                    )
-                    TextButton(
-                        onClick = ::enterSubstitutionMode,
-                        enabled = liveActionsEnabled && placements.isNotEmpty(),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
-                    ) { Text("Substitution mode") }
-                }
-
-                LazyRow(
-                    modifier = Modifier.fillMaxWidth().height(64.dp),
-                    contentPadding = PaddingValues(horizontal = 2.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally)
-                ) {
-                    val leastPlayedBench = PlayingTimeRules.leastPlayed(eligibleBenchIds, ::playedMs)
-                    items(
-                        bench.sortedWith(
-                            compareBy<MatchLineupPlacement>({ it.playerId !in eligibleBenchIds }, { playedMs(it.playerId) })
-                        ),
-                        key = { it.playerId }
-                    ) { placement ->
-                        playersById[placement.playerId]?.let { player ->
-                            val state = squadById[player.id]?.state
-                            BenchMinuteCard(
-                                player = player,
-                                minutes = MatchClockCalculator.displayedWholeMinutes(playedMs(player.id)),
-                                enabled = state !in setOf(
-                                    PlayerMatchState.REMOVED,
-                                    PlayerMatchState.DISMISSED,
-                                    PlayerMatchState.UNAVAILABLE
-                                ),
-                                stateLabel = when (state) {
-                                    PlayerMatchState.REMOVED -> "Out"
-                                    PlayerMatchState.DISMISSED -> "Sent off"
-                                    else -> null
-                                },
-                                highlighted = player.id in leastPlayedBench,
-                                onClick = { selectedPlayerId = player.id }
-                            )
-                        }
-                    }
-                }
-            } else if (tab == LiveTab.CAMERA) {
-                CameraMatchPanel(
-                    matchId = matchId,
-                    matchClockMs = matchTimeMs,
-                    recordings = recordings,
-                    modifier = Modifier.weight(1f).fillMaxWidth()
-                )
-            } else {
-                MatchTimeline(
-                    // Tags on an imported video use video positions, not match time.
-                    events = events.filterNot(be.matchreview.app.domain.VideoEventRules::isImportedVideoTag).sortedWith(
-                        compareByDescending<MatchEvent> { it.timestampMs }.thenByDescending { it.id }
-                    ),
-                    playersById = playersById,
-                    recordings = recordings,
-                    modifier = Modifier.weight(1f),
-                    onPlayEvent = { selectedVideoEvent = it },
-                    onEditGoal = { editGoal = it },
-                    onEditGoalPosition = { event ->
-                        goalPlacement = GoalPlacementRequest(
-                            eventId = event.id,
-                            title = if (event.type == "OPPONENT_GOAL") "Where did ${current.opponent} score?"
-                            else "Where did $teamName score?",
-                            initialX = event.goalX,
-                            initialY = event.goalY
-                        )
-                    },
-                    onDeleteGoal = { pendingGoalDeletion = it },
-                    onDeleteEvent = { pendingEventDeletion = it },
-                    undoableRoundId = undoableRoundId,
-                    onUndoRound = { showUndoRoundConfirmation = true }
-                )
-            }
+            tabContent()
         }
+    }
+
+    if (showFullVideo) {
+        MatchVideoDialog(
+            title = "$teamName vs ${current.opponent}",
+            recordings = recordings,
+            periods = periods,
+            events = events,
+            playersById = playersById,
+            onDismiss = { showFullVideo = false }
+        )
     }
 
     playersById[selectedPlayerId]?.let { player ->
@@ -1046,7 +1182,14 @@ fun LiveMatchScreen(
         AlertDialog(
             onDismissRequest = { showEndPeriodConfirmation = false },
             title = { Text("End period ${current.currentPeriod}?") },
-            text = { Text("The match clock will stop. You can start the next period afterward.") },
+            text = {
+                Text(
+                    if (recordingThisMatch && recordingFollowsPeriods) {
+                        "The match clock will stop and the video of this period is saved. " +
+                            "Recording starts again when you start the next period."
+                    } else "The match clock will stop. You can start the next period afterward."
+                )
+            },
             confirmButton = {
                 AppButton(
                     onClick = {
@@ -1154,8 +1297,22 @@ fun LiveMatchScreen(
 private fun RecordingStatusChip(
     state: CameraRecordingState,
     matchId: Long,
+    /** The recording was saved at the period end and starts again with the next period. */
+    restartsWithPeriod: Boolean,
+    nextPeriod: Int,
     onClick: () -> Unit
 ) {
+    if (restartsWithPeriod && state !is CameraRecordingState.Error && state.activeMatchId == null) {
+        AssistChip(
+            onClick = onClick,
+            label = { Text("Camera paused • records again when period $nextPeriod starts", maxLines = 1) },
+            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+            colors = AssistChipDefaults.assistChipColors(
+                containerColor = MaterialTheme.colorScheme.secondaryContainer
+            )
+        )
+        return
+    }
     val relevant = state.activeMatchId == matchId || state is CameraRecordingState.Error
     if (!relevant) return
 
@@ -1613,18 +1770,21 @@ private fun LivePitch(
     playersById: Map<Long, Player>,
     minutesFor: (Long) -> Long,
     onPlayerClick: (Long) -> Unit,
+    /** The pitch on its side, our goal on the left, for landscape screens. */
+    horizontal: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     BoxWithConstraints(
         modifier.clip(RoundedCornerShape(16.dp)).background(PitchColors.grass)
     ) {
-        PitchLines(Modifier.fillMaxSize())
+        PitchLines(Modifier.fillMaxSize(), horizontal = horizontal)
         placements.forEach { placement ->
             val player = playersById[placement.playerId] ?: return@forEach
             val marker = 72.dp
+            val (shownX, shownY) = PitchOrientation.toDisplay(placement.normalizedX, placement.normalizedY, horizontal)
             // Name and minutes hang below the badge; keep the whole marker on the grass.
-            val x = (maxWidth * placement.normalizedX - marker / 2).coerceIn(0.dp, (maxWidth - marker).coerceAtLeast(0.dp))
-            val y = (maxHeight * placement.normalizedY - 21.dp).coerceIn(0.dp, (maxHeight - 62.dp).coerceAtLeast(0.dp))
+            val x = (maxWidth * shownX - marker / 2).coerceIn(0.dp, (maxWidth - marker).coerceAtLeast(0.dp))
+            val y = (maxHeight * shownY - 21.dp).coerceIn(0.dp, (maxHeight - 62.dp).coerceAtLeast(0.dp))
             Column(
                 Modifier.offset(x = x, y = y).width(marker).clickable { onPlayerClick(player.id) },
                 horizontalAlignment = Alignment.CenterHorizontally
@@ -1665,13 +1825,14 @@ private fun BenchMinuteCard(
     enabled: Boolean,
     stateLabel: String?,
     highlighted: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier.width(78.dp).fillMaxHeight()
 ) {
     Surface(
         shape = MaterialTheme.shapes.small,
         tonalElevation = 2.dp,
         color = if (enabled) MaterialTheme.colorScheme.surfaceContainerHighest else MaterialTheme.colorScheme.surfaceVariant,
-        modifier = Modifier.width(78.dp).fillMaxHeight().clickable(enabled = enabled, onClick = onClick)
+        modifier = modifier.clickable(enabled = enabled, onClick = onClick)
     ) {
         Column(
             Modifier.padding(horizontal = 4.dp, vertical = 3.dp),

@@ -8,7 +8,9 @@ import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
@@ -34,7 +36,10 @@ import org.robolectric.annotation.GraphicsMode
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(qualifiers = "w360dp-h760dp-hdpi")
-class ScreenshotTest {
+open class ScreenshotTest {
+    /** Added to every file name, so other screen shapes do not overwrite these. */
+    protected open val namePrefix = ""
+
     @get:Rule
     val compose = createAndroidComposeRule<ComponentActivity>()
 
@@ -79,6 +84,14 @@ class ScreenshotTest {
         repository.recordKeeperSave(finishedId, players[0].id, start + 500_000, wall + 500_000)
         repository.recordOpponentGoal(finishedId, start + 700_000, wall + 700_000)
         repository.recordOurGoal(finishedId, players[6].id, null, start + 820_000, wall + 820_000)
+        // Two saved clips, so the full match video has something to list.
+        listOf(0L to 420_000L, 420_000L to 480_000L).forEach { (clockStart, duration) ->
+            val clip = repository.beginRecordingSegment(finishedId, clockStart, 90, audioEnabled = false)
+            repository.markRecordingStarted(clip, wall + clockStart)
+            repository.completeRecordingSegment(
+                clip, "content://media/external/video/media/$clip", clockStart + duration, duration, 50_000_000L
+            )
+        }
         repository.finishLiveMatch(finishedId, start + 900_000, wall + 900_000)
 
         val liveId = match("City Juniors", "2026-10-03")
@@ -114,14 +127,26 @@ class ScreenshotTest {
         settle(40)
     }
 
-    private fun capture(name: String) {
+    /** The newest window on screen, such as an open dialog. */
+    private fun topmostWindow(): android.view.View {
+        val global = Class.forName("android.view.WindowManagerGlobal")
+        val instance = global.getMethod("getInstance").invoke(null)
+        val views = global.getDeclaredField("mViews").apply { isAccessible = true }.get(instance) as List<*>
+        return views.last() as android.view.View
+    }
+
+    /** [topmost] captures the newest window, such as an open dialog. */
+    private fun capture(name: String, topmost: Boolean = false) {
         settle(20)
-        val bitmap = runCatching { compose.onRoot().captureToImage().asAndroidBitmap() }.getOrElse {
-            val view = compose.activity.window.decorView
+        val bitmap = runCatching {
+            (if (topmost) compose.onAllNodes(isRoot()).onLast() else compose.onRoot())
+                .captureToImage().asAndroidBitmap()
+        }.getOrElse {
+            val view = if (topmost) topmostWindow() else compose.activity.window.decorView
             Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888).also { view.draw(Canvas(it)) }
         }
         val directory = File("build/screenshots").apply { mkdirs() }
-        File(directory, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        File(directory, "$namePrefix$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
 
     @Test fun dashboard() { fixture(); show(null); capture("01-dashboard") }
@@ -169,4 +194,22 @@ class ScreenshotTest {
     @Test fun review() { val ids = fixture(); show("review/${ids.finishedId}"); capture("13-review") }
 
     @Test fun backup() { fixture(); show("backup"); capture("14-backup") }
+
+    @Test
+    fun fullMatchVideo() {
+        val ids = fixture()
+        show("review/${ids.finishedId}")
+        click("Video")
+        capture("15-review-video")
+        click("Watch full match")
+        capture("16-full-match-video", topmost = true)
+    }
+}
+
+/** The same screens on a phone held sideways. */
+@RunWith(AndroidJUnit4::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(qualifiers = "w760dp-h360dp-land-hdpi")
+class LandscapeScreenshotTest : ScreenshotTest() {
+    override val namePrefix = "land-"
 }
