@@ -315,7 +315,8 @@ fun LiveMatchScreen(
                         val who = playerId?.let { playersById[it]?.name }
                             ?: if (MatchActions.isOpponent(type)) current.opponent else teamName
                         val result = snackbarHostState.showSnackbar(
-                            message = "${MatchActions.label(type) ?: type} • $who",
+                            message = if (type == MatchActions.MARK) "Moment marked in the video"
+                            else "${MatchActions.label(type) ?: type} • $who",
                             actionLabel = "Undo",
                             withDismissAction = true
                         )
@@ -666,6 +667,7 @@ fun LiveMatchScreen(
                 followPeriods = recordingFollowsPeriods,
                 onFollowPeriodsChange = vm::setRecordingFollowsPeriods,
                 onWatchVideo = { showFullVideo = true },
+                onMarkMoment = { recordAction(MatchActions.MARK, null) },
                 modifier = Modifier.weight(1f).fillMaxWidth()
             )
             LiveTab.TIMELINE -> MatchTimeline(
@@ -1677,6 +1679,7 @@ private fun eventTitle(event: MatchEvent, playersById: Map<Long, Player>): Strin
     "PLAYER_OFF" -> "${playersById[event.playerId]?.name ?: "Player"} off"
     "POSITION_CHANGE" -> "Positions changed"
     "KICK_OFF" -> "Kick-off"
+    MatchActions.MARK -> "Marked moment"
     else -> event.type.lowercase().replace('_', ' ').replaceFirstChar { it.uppercase() }
 }
 
@@ -2061,6 +2064,10 @@ private fun MatchActionsSheet(
                 "Goals count as shots on target; saves count as $opponentName shots on target.",
                 style = MaterialTheme.typography.bodySmall
             )
+            AppOutlinedButton(
+                onClick = { onAction(MatchActions.MARK) },
+                modifier = Modifier.fillMaxWidth()
+            ) { Text("Mark this moment in the video") }
         }
     }
 }

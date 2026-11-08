@@ -15,12 +15,14 @@ object MatchActions {
     const val OPPONENT_CORNER = "OPPONENT_CORNER"
     const val OPPONENT_YELLOW_CARD = "OPPONENT_YELLOW_CARD"
     const val OPPONENT_RED_CARD = "OPPONENT_RED_CARD"
+    /** A moment flagged while filming, to find it back in the video. */
+    const val MARK = "MARK"
 
     /** Actions that can simply be deleted from the timeline. */
     val DELETABLE = setOf(
         OUR_SHOT_ON_TARGET, OUR_SHOT_OFF_TARGET, OUR_CORNER, YELLOW_CARD, RED_CARD,
         OPPONENT_SHOT_ON_TARGET, OPPONENT_SHOT_OFF_TARGET, OPPONENT_CORNER,
-        OPPONENT_YELLOW_CARD, OPPONENT_RED_CARD, "KEEPER_SAVE"
+        OPPONENT_YELLOW_CARD, OPPONENT_RED_CARD, "KEEPER_SAVE", MARK
     )
 
     fun label(type: String): String? = when (type) {
@@ -29,6 +31,7 @@ object MatchActions {
         OUR_CORNER, OPPONENT_CORNER -> "Corner"
         YELLOW_CARD, OPPONENT_YELLOW_CARD -> "Yellow card"
         RED_CARD, OPPONENT_RED_CARD -> "Red card"
+        MARK -> "Marked moment"
         else -> null
     }
 

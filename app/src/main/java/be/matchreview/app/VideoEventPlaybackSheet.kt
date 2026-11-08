@@ -16,6 +16,7 @@ import androidx.media3.ui.PlayerView
 import be.matchreview.app.data.MatchEvent
 import be.matchreview.app.data.Player
 import be.matchreview.app.data.RecordingSegment
+import be.matchreview.app.domain.MatchActions
 import be.matchreview.app.domain.MatchClockCalculator
 import be.matchreview.app.domain.VideoEventRules
 
@@ -100,5 +101,11 @@ internal fun eventPlaybackTitle(event: MatchEvent, playersById: Map<Long, Player
         "PLAYER_OFF" -> "${playersById[event.playerId]?.name ?: "Player"} left"
         "INJURY_OFF" -> "Injury • ${playersById[event.playerId]?.name ?: "Player"}"
         "DISMISSAL" -> "Dismissal • ${playersById[event.playerId]?.name ?: "Player"}"
-        else -> event.type.lowercase().replace('_', ' ').replaceFirstChar { it.uppercase() }
+        "KEEPER_SAVE" -> "Save • ${playersById[event.playerId]?.name ?: "Keeper"}"
+        "KICK_OFF" -> "Kick-off"
+        else -> MatchActions.label(event.type)?.let { label ->
+            val who = playersById[event.playerId]?.name
+                ?: if (MatchActions.isOpponent(event.type)) "opponent" else null
+            listOfNotNull(label, who).joinToString(" • ")
+        } ?: event.type.lowercase().replace('_', ' ').replaceFirstChar { it.uppercase() }
     }

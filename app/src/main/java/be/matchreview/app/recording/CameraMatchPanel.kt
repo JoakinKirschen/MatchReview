@@ -21,6 +21,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BookmarkAdd
 import androidx.compose.material.icons.filled.Cameraswitch
 import androidx.compose.material.icons.filled.FlashOff
 import androidx.compose.material.icons.filled.FlashOn
@@ -67,6 +68,8 @@ fun CameraMatchPanel(
     onFollowPeriodsChange: (Boolean) -> Unit,
     /** Opens all saved clips of the match as one video. */
     onWatchVideo: () -> Unit,
+    /** Flags the current moment so it is easy to find in the video later. */
+    onMarkMoment: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -312,6 +315,14 @@ fun CameraMatchPanel(
                     onClick = { CameraRecordingController.setTorch(!torch) }
                 )
             }
+            val markButton: @Composable () -> Unit = {
+                OverlayIconButton(
+                    icon = Icons.Filled.BookmarkAdd,
+                    description = "Mark this moment in the video",
+                    enabled = recording,
+                    onClick = onMarkMoment
+                )
+            }
             if (sideControls) {
                 // A wide, short preview (phone held sideways) keeps its height free: the
                 // controls stand along the right edge, like in a camera app.
@@ -329,7 +340,10 @@ fun CameraMatchPanel(
                         lensButton()
                     }
                     RecordButton(recording = recording, enabled = recordEnabled, onClick = ::toggleRecording)
-                    torchButton()
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        torchButton()
+                        markButton()
+                    }
                 }
             } else {
                 // Camera controls along the bottom of the preview, like a camera app.
@@ -346,8 +360,7 @@ fun CameraMatchPanel(
                     lensButton()
                     RecordButton(recording = recording, enabled = recordEnabled, onClick = ::toggleRecording)
                     torchButton()
-                    // Keeps the record button centred.
-                    Spacer(Modifier.size(48.dp))
+                    markButton()
                 }
             }
         }

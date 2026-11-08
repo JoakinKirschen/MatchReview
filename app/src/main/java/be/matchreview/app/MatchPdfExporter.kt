@@ -111,6 +111,8 @@ object MatchPdfExporter {
                 writer.text("No events recorded.")
             } else {
                 matchEvents
+                    // Marks only help find moments in the video; they are not match facts.
+                    .filterNot { it.type == MatchActions.MARK }
                     .forEach { event ->
                         val people = listOfNotNull(
                             event.playerId?.let { names[it] },
