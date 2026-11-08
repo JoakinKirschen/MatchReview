@@ -1,7 +1,19 @@
 package be.matchreview.app
 
 import android.net.Uri
+import android.view.LayoutInflater
 import android.widget.FrameLayout
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.IntSize
+import androidx.media3.exoplayer.SeekParameters
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -34,6 +46,7 @@ import be.matchreview.app.data.RecordingSegment
 import be.matchreview.app.domain.MatchClockCalculator
 import be.matchreview.app.domain.MatchVideoClip
 import be.matchreview.app.domain.MatchVideoRules
+import be.matchreview.app.domain.VideoViewRules
 import be.matchreview.app.ui.isLandscape
 import kotlinx.coroutines.delay
 
@@ -58,8 +71,17 @@ fun MatchVideoDialog(
     var clipIndex by remember { mutableIntStateOf(0) }
     var positionMs by remember { mutableLongStateOf(0L) }
     var showList by remember { mutableStateOf(true) }
+    var speed by remember { mutableFloatStateOf(1f) }
+    var zoom by remember { mutableFloatStateOf(1f) }
+    var panX by remember { mutableFloatStateOf(0f) }
+    var panY by remember { mutableFloatStateOf(0f) }
 
-    DisposableEffect(Unit) { onDispose { player.release() } }
+    DisposableEffect(Unit) {
+        // Frame steps land on the exact frame instead of the nearest key frame.
+        player.setSeekParameters(SeekParameters.EXACT)
+        onDispose { player.release() }
+    }
+    LaunchedEffect(speed) { player.setPlaybackSpeed(speed) }
     // Only the clip list matters here; a new event elsewhere must not restart playback.
     LaunchedEffect(clips.map { it.segment.id }) {
         if (clips.isEmpty()) return@LaunchedEffect
@@ -74,6 +96,12 @@ fun MatchVideoDialog(
             positionMs = player.currentPosition
             delay(500)
         }
+    }
+
+    fun stepFrame(forward: Boolean) {
+        player.pause()
+        player.seekTo(VideoViewRules.stepFrame(player.currentPosition, player.duration, forward))
+        positionMs = player.currentPosition
     }
 
     fun play(index: Int, offsetMs: Long) {
@@ -100,17 +128,31 @@ fun MatchVideoDialog(
                     } else {
                         AndroidView(
                             factory = { ctx ->
-                                PlayerView(ctx).apply {
+                                (LayoutInflater.from(ctx).inflate(R.layout.match_video_player, null) as PlayerView).apply {
                                     this.player = player
-                                    keepScreenOn = true
                                     layoutParams = FrameLayout.LayoutParams(
                                         FrameLayout.LayoutParams.MATCH_PARENT,
                                         FrameLayout.LayoutParams.MATCH_PARENT
                                     )
                                 }
                             },
-                            update = { it.player = player },
-                            modifier = Modifier.fillMaxSize()
+                            update = { view ->
+                                view.player = player
+                                // Only the picture zooms; the playback controls keep their size.
+                                view.videoSurfaceView?.apply {
+                                    scaleX = zoom
+                                    scaleY = zoom
+                                    translationX = panX
+                                    translationY = panY
+                                }
+                            },
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .pinchToZoom { zoomChange, pan, size ->
+                                    zoom = VideoViewRules.clampZoom(zoom * zoomChange)
+                                    panX = VideoViewRules.clampPan(panX + pan.x, zoom, size.width.toFloat())
+                                    panY = VideoViewRules.clampPan(panY + pan.y, zoom, size.height.toFloat())
+                                }
                         )
                     }
                     Row(
@@ -148,6 +190,25 @@ fun MatchVideoDialog(
                                     contentDescription = if (showList) "Hide periods and events" else "Show periods and events",
                                     tint = Color.White
                                 )
+                            }
+                        }
+                    }
+                    // Study tools, in their own row so they fit a phone held upright.
+                    if (clips.isNotEmpty()) Row(
+                        Modifier
+                            .align(Alignment.TopEnd)
+                            .statusBarsPadding()
+                            .padding(top = 60.dp, end = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        OverlayAction("◀|", "One frame back") { stepFrame(forward = false) }
+                        OverlayAction("|▶", "One frame forward") { stepFrame(forward = true) }
+                        OverlayAction(VideoViewRules.speedLabel(speed), "Playback speed ${VideoViewRules.speedLabel(speed)}, tap to change") {
+                            speed = VideoViewRules.nextSpeed(speed)
+                        }
+                        if (zoom > 1f) {
+                            OverlayAction("${"%.1f".format(zoom)}×", "Zoomed in, tap to zoom out") {
+                                zoom = 1f; panX = 0f; panY = 0f
                             }
                         }
                     }
@@ -267,3 +328,38 @@ private fun MatchVideoChapters(
         }
     }
 }
+
+/** A small text button on the video, readable on any picture. */
+@Composable
+private fun OverlayAction(label: String, description: String, onClick: () -> Unit) {
+    Text(
+        label,
+        color = Color.White,
+        fontWeight = FontWeight.Bold,
+        style = MaterialTheme.typography.labelLarge,
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color(0x99000000))
+            .clickable(onClick = onClick)
+            .semantics { contentDescription = description }
+            .padding(horizontal = 10.dp, vertical = 8.dp)
+    )
+}
+
+/**
+ * Two-finger pinch and drag, read before the player view sees the touches so a single tap
+ * still shows the playback controls.
+ */
+private fun Modifier.pinchToZoom(onTransform: (zoomChange: Float, pan: Offset, size: IntSize) -> Unit): Modifier =
+    pointerInput(Unit) {
+        awaitEachGesture {
+            awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+            do {
+                val event = awaitPointerEvent(PointerEventPass.Initial)
+                if (event.changes.count { it.pressed } >= 2) {
+                    onTransform(event.calculateZoom(), event.calculatePan(), size)
+                    event.changes.forEach { it.consume() }
+                }
+            } while (event.changes.any { it.pressed })
+        }
+    }

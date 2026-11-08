@@ -127,6 +127,11 @@ open class ScreenshotTest {
         settle(40)
     }
 
+    private fun hideTextureViews(view: android.view.View) {
+        if (view is android.view.TextureView) view.visibility = android.view.View.INVISIBLE
+        if (view is android.view.ViewGroup) (0 until view.childCount).forEach { hideTextureViews(view.getChildAt(it)) }
+    }
+
     /** The newest window on screen, such as an open dialog. */
     private fun topmostWindow(): android.view.View {
         val global = Class.forName("android.view.WindowManagerGlobal")
@@ -143,6 +148,8 @@ open class ScreenshotTest {
                 .captureToImage().asAndroidBitmap()
         }.getOrElse {
             val view = if (topmost) topmostWindow() else compose.activity.window.decorView
+            // A TextureView (the video picture) only draws on the GPU; leave it blank here.
+            hideTextureViews(view)
             Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888).also { view.draw(Canvas(it)) }
         }
         val directory = File("build/screenshots").apply { mkdirs() }
