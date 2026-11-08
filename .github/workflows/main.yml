@@ -1,10 +1,10 @@
 name: Android Build
 
 on:
+  # Every pushed branch is built, so work branches are checked before a pull request.
   push:
     branches:
-      - main
-      - master
+      - "**"
   pull_request:
   workflow_dispatch:
     inputs:
