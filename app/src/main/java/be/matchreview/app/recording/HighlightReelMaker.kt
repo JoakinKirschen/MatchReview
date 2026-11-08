@@ -35,14 +35,14 @@ object HighlightReelMaker {
         fileName: String,
         onProgress: (Float) -> Unit = {}
     ): HighlightReel = withContext(Dispatchers.IO) {
-        require(clips.isNotEmpty()) { "There are no recorded goals to put in a highlights video." }
+        require(clips.isNotEmpty()) { "There is nothing recorded to put in this video." }
         val reference = trackFormats(context, Uri.parse(clips.first().uri))
-            ?: throw IllegalStateException("The first goal clip could not be read.")
+            ?: throw IllegalStateException("The first clip could not be read.")
         // Clips from a recording with other video settings cannot be joined without re-encoding.
         val usable = clips.filter { clip ->
             trackFormats(context, Uri.parse(clip.uri))?.let { compatible(reference.video, it.video) } == true
         }
-        if (usable.isEmpty()) throw IllegalStateException("The goal clips could not be read.")
+        if (usable.isEmpty()) throw IllegalStateException("The clips could not be read.")
         val withAudio = reference.audio != null && usable.all { clip ->
             trackFormats(context, Uri.parse(clip.uri))?.audio?.let { compatible(reference.audio, it) } == true
         }

@@ -34,6 +34,7 @@ import be.matchreview.app.domain.MatchExportFormatter
 import be.matchreview.app.domain.MatchStatsRules
 import be.matchreview.app.domain.HighlightClip
 import be.matchreview.app.domain.HighlightRules
+import be.matchreview.app.domain.MatchVideoClip
 import be.matchreview.app.domain.MatchVideoRules
 import be.matchreview.app.recording.HighlightReel
 import be.matchreview.app.recording.HighlightReelMaker
@@ -294,6 +295,10 @@ internal fun ReviewScreen(matchId: Long, vm: MainViewModel, nav: NavHostControll
                 }
             }
         }
+        HighlightsCard(current, events, recordings, matchClips, allPlayers.associateBy { it.id })
+
+        // A video from another camera (a parent's phone, a club camera) can be linked and tagged.
+        Text("Video from another camera", style = MaterialTheme.typography.titleMedium)
         if (player != null) {
             AndroidView(
                 factory = { ctx ->
@@ -305,25 +310,21 @@ internal fun ReviewScreen(matchId: Long, vm: MainViewModel, nav: NavHostControll
                 update = { it.player = player },
                 modifier = Modifier.fillMaxWidth().height(230.dp)
             )
-        } else {
-            AppCard(Modifier.fillMaxWidth().height(180.dp)) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    AppButton(onClick = { videoPicker.launch(arrayOf("video/*")) }) { Text("Import match video") }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                AppButton(
+                    onClick = { tagPosition = player?.currentPosition ?: 0L; showTag = true },
+                    modifier = Modifier.weight(1f)
+                ) { Text("Tag moment") }
+                AppOutlinedButton(onClick = { videoPicker.launch(arrayOf("video/*")) }, modifier = Modifier.weight(1f)) {
+                    Text("Change video")
                 }
             }
+        } else {
+            AppOutlinedButton(
+                onClick = { videoPicker.launch(arrayOf("video/*")) },
+                modifier = Modifier.fillMaxWidth()
+            ) { Text("Import a match video") }
         }
-
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            AppButton(
-                onClick = { tagPosition = player?.currentPosition ?: 0L; showTag = true },
-                enabled = player != null,
-                modifier = Modifier.weight(1f)
-            ) { Text("Tag moment") }
-            AppOutlinedButton(onClick = { videoPicker.launch(arrayOf("video/*")) }, modifier = Modifier.weight(1f)) {
-                Text("Change video")
-            }
-        }
-        HighlightsCard(current, events, recordings)
         videoImportMessage?.let { message ->
             AppCard(
                 colors = CardDefaults.cardColors(
@@ -698,27 +699,41 @@ internal fun ReviewScreen(matchId: Long, vm: MainViewModel, nav: NavHostControll
     }
 }
 
-/** Joins the recorded goal clips into one video to watch or share. */
+/**
+ * Joins recorded clips into one video to watch or share: the goals, the marked moments,
+ * one player's moments, or the whole match.
+ */
 @Composable
-internal fun HighlightsCard(match: GameMatch, events: List<MatchEvent>, recordings: List<RecordingSegment>) {
+internal fun HighlightsCard(
+    match: GameMatch,
+    events: List<MatchEvent>,
+    recordings: List<RecordingSegment>,
+    matchClips: List<MatchVideoClip>,
+    playersById: Map<Long, Player>
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val ourClips = remember(events, recordings) { HighlightRules.clips(events, recordings, HighlightRules.OUR_GOALS) }
     val allClips = remember(events, recordings) { HighlightRules.clips(events, recordings, HighlightRules.ALL_GOALS) }
+    val markClips = remember(events, recordings) { HighlightRules.clips(events, recordings, HighlightRules.MARKS) }
+    val playerMoments = remember(events, recordings) { HighlightRules.playersWithMoments(events, recordings) }
     var progress by remember { mutableStateOf<Float?>(null) }
     var reel by remember { mutableStateOf<HighlightReel?>(null) }
+    var reelTitle by remember { mutableStateOf("") }
     var message by remember { mutableStateOf<String?>(null) }
-    fun make(clips: List<HighlightClip>, label: String) {
+    var playerMenu by remember { mutableStateOf(false) }
+    fun slug(text: String) = text.lowercase(Locale.ROOT).replace(Regex("[^a-z0-9]+"), "-").trim('-')
+    fun make(clips: List<HighlightClip>, label: String, title: String) {
         progress = 0f
         message = null
         reel = null
+        reelTitle = title
         scope.launch {
             runCatching {
-                val opponent = match.opponent.lowercase(Locale.ROOT).replace(Regex("[^a-z0-9]+"), "-").trim('-')
                 HighlightReelMaker.make(
                     context,
                     clips,
-                    "matchreview-$label-${match.matchDate}-${opponent.ifBlank { "match" }}.mp4"
+                    "matchreview-${slug(label)}-${match.matchDate}-${slug(match.opponent).ifBlank { "match" }}.mp4"
                 ) { progress = it }
             }.onSuccess {
                 reel = it
@@ -728,38 +743,75 @@ internal fun HighlightsCard(match: GameMatch, events: List<MatchEvent>, recordin
                     if (it.skipped > 0) append(". ${it.skipped} clip(s) recorded with other settings were left out")
                 }
             }.onFailure {
-                message = "Highlights failed: ${it.message ?: "unknown error"}"
+                message = "Video failed: ${it.message ?: "unknown error"}"
             }
             progress = null
         }
     }
     AppCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text("Goal highlights", style = MaterialTheme.typography.titleMedium)
-            if (allClips.isEmpty()) {
+            Text("Highlights and video files", style = MaterialTheme.typography.titleMedium)
+            if (matchClips.isEmpty()) {
                 Text(
-                    "Record the match with the camera in the live screen to make a video of all the goals.",
+                    "Record the match with the camera in the live screen to make highlight videos.",
                     style = MaterialTheme.typography.bodySmall
                 )
                 return@Column
             }
             Text(
                 "Joins about ${HighlightRules.BEFORE_MS / 1000} s before and ${HighlightRules.AFTER_MS / 1000} s after " +
-                    "each recorded goal into one video.",
+                    "each recorded moment into one video, saved in Movies/MatchReview.",
                 style = MaterialTheme.typography.bodySmall
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 AppTonalButton(
-                    onClick = { make(ourClips, "our-goals") },
+                    onClick = { make(ourClips, "our-goals", "Goals vs ${match.opponent}") },
                     enabled = progress == null && ourClips.isNotEmpty(),
                     modifier = Modifier.weight(1f).heightIn(min = 48.dp)
                 ) { Text("Our goals (${ourClips.sumOf { it.eventIds.size }})") }
                 AppOutlinedButton(
-                    onClick = { make(allClips, "goals") },
-                    enabled = progress == null,
+                    onClick = { make(allClips, "goals", "All goals vs ${match.opponent}") },
+                    enabled = progress == null && allClips.isNotEmpty(),
                     modifier = Modifier.weight(1f).heightIn(min = 48.dp)
                 ) { Text("All goals (${allClips.sumOf { it.eventIds.size }})") }
             }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                AppOutlinedButton(
+                    onClick = { make(markClips, "marked", "Marked moments vs ${match.opponent}") },
+                    enabled = progress == null && markClips.isNotEmpty(),
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp)
+                ) { Text("Marked (${markClips.sumOf { it.eventIds.size }})", maxLines = 1) }
+                Box(Modifier.weight(1f)) {
+                    AppOutlinedButton(
+                        onClick = { playerMenu = true },
+                        enabled = progress == null && playerMoments.isNotEmpty(),
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                    ) { Text("One player…", maxLines = 1) }
+                    DropdownMenu(expanded = playerMenu, onDismissRequest = { playerMenu = false }) {
+                        playerMoments.entries
+                            .sortedBy { playersById[it.key]?.name.orEmpty() }
+                            .forEach { (playerId, count) ->
+                                val name = playersById[playerId]?.name ?: return@forEach
+                                DropdownMenuItem(
+                                    text = { Text("$name ($count)") },
+                                    onClick = {
+                                        playerMenu = false
+                                        make(
+                                            HighlightRules.playerClips(events, recordings, playerId),
+                                            name,
+                                            "$name vs ${match.opponent}"
+                                        )
+                                    }
+                                )
+                            }
+                    }
+                }
+            }
+            AppOutlinedButton(
+                onClick = { make(HighlightRules.fullMatch(matchClips), "full-match", "Full match vs ${match.opponent}") },
+                enabled = progress == null,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+            ) { Text("Save the full match as one video") }
             progress?.let { LinearProgressIndicator(progress = { it }, modifier = Modifier.fillMaxWidth()) }
             message?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
             reel?.let { saved ->
@@ -771,7 +823,7 @@ internal fun HighlightsCard(match: GameMatch, events: List<MatchEvent>, recordin
                         modifier = Modifier.weight(1f).heightIn(min = 48.dp)
                     ) { Text("Play") }
                     AppOutlinedButton(
-                        onClick = { ExternalApps.share(context, saved.uri, "video/mp4", "Goals vs ${match.opponent}") },
+                        onClick = { ExternalApps.share(context, saved.uri, "video/mp4", reelTitle) },
                         modifier = Modifier.weight(1f).heightIn(min = 48.dp)
                     ) { Text("Share") }
                 }
