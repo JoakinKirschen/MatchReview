@@ -1,7 +1,7 @@
 # MatchReview Pass Changelog
 
 This is the **single source of truth** for implementation-pass notes and change tracking.
-It consolidates implementation notes for Passes 1–64.
+It consolidates implementation notes for Passes 1–68.
 
 ## How to maintain this file
 
@@ -37,7 +37,7 @@ For every future development pass:
 
 | Pass | Status | Planned change | Version impact |
 |---:|---|---|---|
-| 65 | Not scheduled | Add the next approved recommendation here | To be determined |
+| 69 | Not scheduled | Add the next approved recommendation here | To be determined |
 
 ## Documentation changes
 
@@ -1474,3 +1474,82 @@ begin.
 
 ### Tests and verification
 - Checked screen by screen with the CI screenshots; all unit tests pass.
+
+## Pass 65 — Landscape, full match video and period-by-period recording
+
+**Status:** Completed  
+**Completed:** 2026-11-08  
+**Version impact:** None (no database or backup-format change)
+
+### Added or changed
+- Turning the phone no longer restarts the screen (`configChanges` on `MainActivity`), so the camera preview, open sheets, drags and the chosen live tab survive a rotation. The live tab is also saved state.
+- Landscape layouts: the live match screen puts score, quick actions and clock buttons in a 320 dp side panel and gives the rest of the screen to the pitch, camera or timeline; the lineup, substitution mode and live pitch lie on their side (our goal on the left) with the bench in a column beside them (`PitchOrientation`); the squad screen shows its filters beside the player list; top-level screens use a navigation rail instead of the bottom bar.
+- Camera tab: on a wide, short preview the controls stand along the right edge like a camera app; clips are recorded in the orientation the phone was held at the start (`VideoCapture` target rotation).
+- Recording follows the periods (`PeriodRecordingController`, `PeriodRecordingRules`): ending a period saves the running recording, starting the next period records again with the same sound and camera. A switch in the camera tab turns this off; the pending restart is shown on the live screen and survives the app being closed at half-time.
+- Full match video (`MatchVideoDialog`, `MatchVideoRules`): all saved clips play back to back, full screen, with the match clock, a list of periods/clips and events to jump to. Opened from Review → Video → "Watch full match" and from the camera tab.
+
+### Tests and verification
+- `PitchOrientationTest`, `PeriodRecordingRulesTest`, `MatchVideoRulesTest`; all 178 unit tests pass.
+- `LandscapeScreenshotTest` renders every screenshot screen at 760 × 360 dp; a new `fullMatchVideo` screenshot covers the viewer.
+
+### Deferred or known limitations
+- The recording stops when the coach ends the period, not when the planned period time is reached, so added time is still filmed.
+- A clip keeps the orientation it started in; turning the phone mid-recording affects the next clip.
+
+## Pass 66 — General review: Android 8/9 video, video study tools, match-day comfort, Dutch
+
+**Status:** Completed  
+**Completed:** 2026-11-09  
+**Version impact:** App 1.6.0 (`versionCode 8`); database and backup format unchanged
+
+### Added or changed
+- Android 8 and 9: the storage permission needed to save video in Movies/MatchReview is declared (up to API 28), asked for with the camera, and the file path is given to CameraX.
+- Mark a moment while filming (bookmark button, also in the shots/corners/cards sheet); marks are listed in the timeline and the match video, not in the PDF.
+- Match video viewer: ¼× and ½× speed, one-frame steps, two-finger zoom and pan.
+- Highlights and video files: the full match as one file, a reel per player (goals, assists, saves, shots) and of the marked moments.
+- "Stop filming" menu: manually, when the coach ends the period, or when the planned period time is up (from the clock service, so also with the screen off); the last two restart with the next period.
+- Notification buttons: Our goal, Their goal and Pause/Resume while a period is played, with a confirming vibration and protection against double taps.
+- Outdoor theme: bigger quick-action and clock buttons and match clock. Tablets show the camera next to (or above) the pitch. The live pitch picks its orientation from its space.
+- Backups: size warning when automatic backups include video; "Share latest backup" to send it to Drive or e-mail; the folder hint no longer suggests Drive folders.
+- Dutch translation: `tr()` with named placeholders and `i18n/Dutch.kt` (779 texts), language picker (System, English, Nederlands) that switches immediately; saved data (tag types, file names, SQL) stays English.
+- Code health: `MainActivity.kt` split into one file per screen; CI builds every branch; README rewritten.
+
+### Tests and verification
+- New: `VideoViewRulesTest`, `TranslationCoverageTest`, more cases in `HighlightRulesTest`, `PeriodRecordingRulesTest` and `AutoBackupRulesTest`; outdoor, tablet and Dutch screenshot runs. All unit tests pass locally and on GitHub Actions.
+
+### Deferred or known limitations
+- Not tried on a real device: camera recording on Android 8/9, notification buttons on the lock screen, pinch zoom and frame stepping on real video, and starting the period restart while the phone is locked.
+- Dutch texts were written without a native-speaker review; terms follow common Flemish youth-football usage ("Goal voor", "Wissel", "Periode").
+
+## Pass 67 — French, German, Spanish, Italian and Turkish
+
+**Status:** Completed  
+**Completed:** 2026-11-09  
+**Version impact:** None (still 1.6.0)
+
+### Added or changed
+- Five more languages, each with all 780 texts (`i18n/French.kt`, `German.kt`, `Spanish.kt`, `Italian.kt`, `Turkish.kt`), in common football wording for each country.
+- `AppLanguage` carries the ISO code and its table; "System" picks the phone's language when supported, otherwise English. Dates and numbers follow the chosen language.
+- The language choice on the home screen is a menu (eight choices no longer fit as buttons), each language named in itself.
+- PDF messages on the review screen no longer depend on the text starting with "PDF".
+
+### Tests and verification
+- `TranslationCoverageTest` checks every language for missing texts, matching placeholders and sentences accidentally left in English; a screenshot test renders the live screen in all seven languages. All 236 unit tests pass.
+
+### Deferred or known limitations
+- The translations were written without native-speaker review. Turkish sentences avoid putting case endings on names, which reads slightly formal.
+
+## Pass 68 — Per-app language, release signing, release checklist
+
+**Status:** Completed  
+**Completed:** 2026-11-09  
+**Version impact:** None (still 1.6.0)
+
+### Added or changed
+- `res/xml/locales_config.xml` and `android:localeConfig`: Android 13+ lists the seven languages under Settings > Apps > MatchReview > Language. `LanguageSettings` keeps that setting and the in-app menu as one choice.
+- Release signing: `app/build.gradle.kts` signs release builds with a key from `keystore.properties` (ignored by Git) or `MATCHREVIEW_*` environment variables; without one the release APK stays unsigned. GitHub Actions builds and uploads a signed `android-release-apk` when the key is stored as secrets. `RELEASE_SIGNING.md` explains it.
+- `RELEASE_CHECKLIST.md`: device checks for passes 65–67 and release signing.
+
+### Tests and verification
+- `LanguageSettingsTest` (Robolectric, API 34) checks both directions of the language sync. A release build was signed with a throwaway key and verified with `apksigner`; without a key it builds unsigned.
+

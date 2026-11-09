@@ -21,6 +21,48 @@ object HighlightRules {
 
     val OUR_GOALS = setOf("OUR_GOAL")
     val ALL_GOALS = setOf("OUR_GOAL", "OPPONENT_GOAL")
+    val MARKS = setOf(MatchActions.MARK)
+
+    /** What a player did that is worth seeing again. */
+    private val PLAYER_MOMENTS = setOf(
+        "OUR_GOAL", "KEEPER_SAVE", MatchActions.OUR_SHOT_ON_TARGET, MatchActions.OUR_SHOT_OFF_TARGET
+    )
+
+    /** Longest clip handled when a recording's length is unknown: a whole day. */
+    private const val UNKNOWN_LENGTH_MS = 24 * 60 * 60 * 1000L
+
+    /** The goals, assists, saves and shots of [playerId]. */
+    fun isPlayerMoment(event: MatchEvent, playerId: Long): Boolean =
+        (event.type in PLAYER_MOMENTS && event.playerId == playerId) ||
+            (event.type == "OUR_GOAL" && event.relatedPlayerId == playerId)
+
+    fun playerClips(
+        events: List<MatchEvent>,
+        recordings: List<RecordingSegment>,
+        playerId: Long
+    ): List<HighlightClip> = clips(events, recordings) { isPlayerMoment(it, playerId) }
+
+    /** Players with at least one recorded moment, and how many. */
+    fun playersWithMoments(events: List<MatchEvent>, recordings: List<RecordingSegment>): Map<Long, Int> {
+        val ids = events
+            .filter { VideoEventRules.isPlayable(it, recordings) }
+            .flatMap { listOfNotNull(it.playerId, it.relatedPlayerId) }
+            .toSet()
+        return ids.associateWith { id ->
+            events.count { VideoEventRules.isPlayable(it, recordings) && isPlayerMoment(it, id) }
+        }.filterValues { it > 0 }
+    }
+
+    /** Every saved clip from start to end, in match order: the whole match as one video. */
+    fun fullMatch(clips: List<MatchVideoClip>): List<HighlightClip> = clips.map { clip ->
+        HighlightClip(
+            recordingId = clip.segment.id,
+            uri = clip.segment.uri.orEmpty(),
+            startMs = 0L,
+            endMs = clip.segment.recordingDurationMs.takeIf { it > 0L } ?: UNKNOWN_LENGTH_MS,
+            eventIds = emptyList()
+        )
+    }
 
     /**
      * One window around each recorded event of [types], in match order. Windows that touch
@@ -30,10 +72,17 @@ object HighlightRules {
         events: List<MatchEvent>,
         recordings: List<RecordingSegment>,
         types: Set<String> = ALL_GOALS
+    ): List<HighlightClip> = clips(events, recordings) { it.type in types }
+
+    /** One window around each recorded event that [include] accepts; see [clips]. */
+    fun clips(
+        events: List<MatchEvent>,
+        recordings: List<RecordingSegment>,
+        include: (MatchEvent) -> Boolean
     ): List<HighlightClip> {
         val byId = recordings.associateBy { it.id }
         val windows = events
-            .filter { it.type in types && VideoEventRules.isPlayable(it, recordings) }
+            .filter { include(it) && VideoEventRules.isPlayable(it, recordings) }
             .sortedWith(compareBy<MatchEvent> { it.timestampMs }.thenBy { it.id })
             .mapNotNull { event ->
                 val recording = byId[event.recordingSegmentId] ?: return@mapNotNull null

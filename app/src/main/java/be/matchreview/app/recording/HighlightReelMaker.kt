@@ -1,5 +1,7 @@
 package be.matchreview.app.recording
 
+import be.matchreview.app.i18n.tr
+
 import android.content.ContentValues
 import android.content.Context
 import android.media.MediaCodec
@@ -35,14 +37,14 @@ object HighlightReelMaker {
         fileName: String,
         onProgress: (Float) -> Unit = {}
     ): HighlightReel = withContext(Dispatchers.IO) {
-        require(clips.isNotEmpty()) { "There are no recorded goals to put in a highlights video." }
+        require(clips.isNotEmpty()) { tr("There is nothing recorded to put in this video.") }
         val reference = trackFormats(context, Uri.parse(clips.first().uri))
-            ?: throw IllegalStateException("The first goal clip could not be read.")
+            ?: throw IllegalStateException(tr("The first clip could not be read."))
         // Clips from a recording with other video settings cannot be joined without re-encoding.
         val usable = clips.filter { clip ->
             trackFormats(context, Uri.parse(clip.uri))?.let { compatible(reference.video, it.video) } == true
         }
-        if (usable.isEmpty()) throw IllegalStateException("The goal clips could not be read.")
+        if (usable.isEmpty()) throw IllegalStateException(tr("The clips could not be read."))
         val withAudio = reference.audio != null && usable.all { clip ->
             trackFormats(context, Uri.parse(clip.uri))?.audio?.let { compatible(reference.audio, it) } == true
         }
@@ -143,7 +145,7 @@ object HighlightReelMaker {
             extractor.setDataSource(context, uri, null)
             val track = (0 until extractor.trackCount)
                 .firstOrNull { extractor.getTrackFormat(it).mime().startsWith(mimePrefix) }
-                ?: error("no $mimePrefix track")
+                ?: error(tr("no {mimePrefix} track", "mimePrefix" to mimePrefix))
             extractor.selectTrack(track)
             extractor
         }.getOrElse {
@@ -187,7 +189,7 @@ object HighlightReelMaker {
             )
         } else {
             context.contentResolver.openFileDescriptor(uri, "rw")
-                ?: throw IllegalStateException("The highlights video could not be created.")
+                ?: throw IllegalStateException(tr("The highlights video could not be created."))
         }
 
         fun publish(context: Context) {
@@ -213,7 +215,7 @@ object HighlightReelMaker {
                     }
                     val uri = context.contentResolver.insert(
                         MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY), values
-                    ) ?: throw IllegalStateException("The highlights video could not be saved.")
+                    ) ?: throw IllegalStateException(tr("The highlights video could not be saved."))
                     return Output(uri, null)
                 }
                 val directory = File(context.cacheDir, "shared").apply { mkdirs() }

@@ -1,7 +1,26 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.kapt")
+}
+
+/**
+ * The private release key, from `keystore.properties` next to `settings.gradle.kts` (kept out
+ * of Git) or from environment variables (GitHub Actions secrets). Without it, release builds
+ * are left unsigned and the debug build is unaffected. See RELEASE_SIGNING.md.
+ */
+val releaseKey: Map<String, String>? = run {
+    val properties = Properties()
+    rootProject.file("keystore.properties").takeIf { it.exists() }?.inputStream()?.use { properties.load(it) }
+    val values = mapOf(
+        "storeFile" to "MATCHREVIEW_KEYSTORE_FILE",
+        "storePassword" to "MATCHREVIEW_KEYSTORE_PASSWORD",
+        "keyAlias" to "MATCHREVIEW_KEY_ALIAS",
+        "keyPassword" to "MATCHREVIEW_KEY_PASSWORD"
+    ).mapValues { (key, variable) -> properties.getProperty(key) ?: System.getenv(variable).orEmpty() }
+    values.takeIf { it.values.all(String::isNotBlank) }
 }
 
 android {
@@ -12,8 +31,8 @@ android {
         applicationId = "be.matchreview.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 7
-        versionName = "1.5.0"
+        versionCode = 8
+        versionName = "1.6.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -27,6 +46,20 @@ android {
             storePassword = "android"
             keyAlias = "androiddebugkey"
             keyPassword = "android"
+        }
+        if (releaseKey != null) {
+            create("release") {
+                storeFile = rootProject.file(releaseKey.getValue("storeFile"))
+                storePassword = releaseKey.getValue("storePassword")
+                keyAlias = releaseKey.getValue("keyAlias")
+                keyPassword = releaseKey.getValue("keyPassword")
+            }
+        }
+    }
+
+    buildTypes {
+        getByName("release") {
+            if (releaseKey != null) signingConfig = signingConfigs.getByName("release")
         }
     }
 

@@ -1,5 +1,7 @@
 package be.matchreview.app.domain
 
+import be.matchreview.app.i18n.tr
+
 import be.matchreview.app.data.MatchEvent
 
 /** Event types for the quick match actions; a red card for our player is a DISMISSAL. */
@@ -15,20 +17,23 @@ object MatchActions {
     const val OPPONENT_CORNER = "OPPONENT_CORNER"
     const val OPPONENT_YELLOW_CARD = "OPPONENT_YELLOW_CARD"
     const val OPPONENT_RED_CARD = "OPPONENT_RED_CARD"
+    /** A moment flagged while filming, to find it back in the video. */
+    const val MARK = "MARK"
 
     /** Actions that can simply be deleted from the timeline. */
     val DELETABLE = setOf(
         OUR_SHOT_ON_TARGET, OUR_SHOT_OFF_TARGET, OUR_CORNER, YELLOW_CARD, RED_CARD,
         OPPONENT_SHOT_ON_TARGET, OPPONENT_SHOT_OFF_TARGET, OPPONENT_CORNER,
-        OPPONENT_YELLOW_CARD, OPPONENT_RED_CARD, "KEEPER_SAVE"
+        OPPONENT_YELLOW_CARD, OPPONENT_RED_CARD, "KEEPER_SAVE", MARK
     )
 
     fun label(type: String): String? = when (type) {
-        OUR_SHOT_ON_TARGET, OPPONENT_SHOT_ON_TARGET -> "Shot on target"
-        OUR_SHOT_OFF_TARGET, OPPONENT_SHOT_OFF_TARGET -> "Shot off target"
-        OUR_CORNER, OPPONENT_CORNER -> "Corner"
-        YELLOW_CARD, OPPONENT_YELLOW_CARD -> "Yellow card"
-        RED_CARD, OPPONENT_RED_CARD -> "Red card"
+        OUR_SHOT_ON_TARGET, OPPONENT_SHOT_ON_TARGET -> tr("Shot on target")
+        OUR_SHOT_OFF_TARGET, OPPONENT_SHOT_OFF_TARGET -> tr("Shot off target")
+        OUR_CORNER, OPPONENT_CORNER -> tr("Corner")
+        YELLOW_CARD, OPPONENT_YELLOW_CARD -> tr("Yellow card")
+        RED_CARD, OPPONENT_RED_CARD -> tr("Red card")
+        MARK -> tr("Marked moment")
         else -> null
     }
 
@@ -86,11 +91,11 @@ object MatchStatsRules {
 
     /** Rows of (label, ours, opponent) for tables in the app and the PDF. */
     fun rows(stats: MatchStats): List<Triple<String, Int, Int>> = listOf(
-        Triple("Goals", stats.ours.goals, stats.opponent.goals),
-        Triple("Shots", stats.ours.shots, stats.opponent.shots),
-        Triple("On target", stats.ours.shotsOnTarget, stats.opponent.shotsOnTarget),
-        Triple("Corners", stats.ours.corners, stats.opponent.corners),
-        Triple("Yellow cards", stats.ours.yellowCards, stats.opponent.yellowCards),
-        Triple("Red cards", stats.ours.redCards, stats.opponent.redCards)
+        Triple(tr("Goals"), stats.ours.goals, stats.opponent.goals),
+        Triple(tr("Shots"), stats.ours.shots, stats.opponent.shots),
+        Triple(tr("On target"), stats.ours.shotsOnTarget, stats.opponent.shotsOnTarget),
+        Triple(tr("Corners"), stats.ours.corners, stats.opponent.corners),
+        Triple(tr("Yellow cards"), stats.ours.yellowCards, stats.opponent.yellowCards),
+        Triple(tr("Red cards"), stats.ours.redCards, stats.opponent.redCards)
     )
 }

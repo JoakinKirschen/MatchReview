@@ -16,7 +16,7 @@ Use Git with focused commits. Tag released builds using semantic versions, for e
   - minor: backward-compatible features;
   - major: incompatible product or data changes.
 
-Current release: `versionCode = 7`, `versionName = 1.5.0`.
+Current release: `versionCode = 8`, `versionName = 1.6.0`.
 
 ## Room database
 

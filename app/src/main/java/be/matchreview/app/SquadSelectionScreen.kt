@@ -1,5 +1,7 @@
 package be.matchreview.app
 
+import be.matchreview.app.i18n.tr
+
 import be.matchreview.app.ui.AppCard
 import be.matchreview.app.ui.AppButton
 import be.matchreview.app.ui.AppOutlinedButton
@@ -8,6 +10,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import be.matchreview.app.ui.isLandscape
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -69,60 +74,54 @@ fun SquadSelectionScreen(
         }
     }
 
-    Column(Modifier.fillMaxSize()) {
-        Column(
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SummaryPill("${summary.selectedCount}", "selected", Modifier.weight(1f))
-                SummaryPill("${roster.size}", "in team", Modifier.weight(1f))
-                SummaryPill("${current.playersOnPitch}", "on pitch", Modifier.weight(1f))
-            }
-            OutlinedTextField(
-                value = search,
-                onValueChange = { search = it },
-                label = { Text("Search player, number or position") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
+    val controls: @Composable () -> Unit = {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            SummaryPill("${summary.selectedCount}", "selected", Modifier.weight(1f))
+            SummaryPill("${roster.size}", tr("in team"), Modifier.weight(1f))
+            SummaryPill("${current.playersOnPitch}", tr("on pitch"), Modifier.weight(1f))
+        }
+        OutlinedTextField(
+            value = search,
+            onValueChange = { search = it },
+            label = { Text(tr("Search player, number or position")) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            val filters = listOf(
+                "ALL" to tr("All"),
+                AvailabilityStatus.AVAILABLE.name to tr("Available"),
+                AvailabilityStatus.INJURED.name to tr("Injured"),
+                AvailabilityStatus.SUSPENDED.name to tr("Suspended"),
+                AvailabilityStatus.UNAVAILABLE.name to tr("Unavailable")
             )
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                val filters = listOf(
-                    "ALL" to "All",
-                    AvailabilityStatus.AVAILABLE.name to "Available",
-                    AvailabilityStatus.INJURED.name to "Injured",
-                    AvailabilityStatus.SUSPENDED.name to "Suspended",
-                    AvailabilityStatus.UNAVAILABLE.name to "Unavailable"
+            items(filters, key = { it.first }) { filter ->
+                FilterChip(
+                    selected = availabilityFilter == filter.first,
+                    onClick = { availabilityFilter = filter.first },
+                    label = { Text(filter.second) }
                 )
-                items(filters, key = { it.first }) { filter ->
-                    FilterChip(
-                        selected = availabilityFilter == filter.first,
-                        onClick = { availabilityFilter = filter.first },
-                        label = { Text(filter.second) }
-                    )
-                }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                AppTonalButton(
-                    onClick = { vm.markAndSelectAllAvailable(matchId) },
-                    modifier = Modifier.weight(1f)
-                ) { Text("Select all") }
-                AppOutlinedButton(
-                    onClick = { vm.clearSquadSelection(matchId) },
-                    modifier = Modifier.weight(1f)
-                ) { Text("Clear selection") }
             }
         }
-
-        HorizontalDivider()
-
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            AppTonalButton(
+                onClick = { vm.markAndSelectAllAvailable(matchId) },
+                modifier = Modifier.weight(1f)
+            ) { Text(tr("Select all")) }
+            AppOutlinedButton(
+                onClick = { vm.clearSquadSelection(matchId) },
+                modifier = Modifier.weight(1f)
+            ) { Text(tr("Clear selection")) }
+        }
+    }
+    val playerList: @Composable (Modifier) -> Unit = { modifier ->
         if (roster.isEmpty()) {
-            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                Text("This team has no players. Add players to the team first.")
+            Box(modifier, contentAlignment = Alignment.Center) {
+                Text(tr("This team has no players. Add players to the team first."))
             }
         } else {
             LazyColumn(
-                modifier = Modifier.weight(1f),
+                modifier = modifier,
                 contentPadding = PaddingValues(12.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
@@ -146,41 +145,73 @@ fun SquadSelectionScreen(
                 if (visiblePlayers.isEmpty()) {
                     item {
                         Text(
-                            "No players match your search.",
+                            tr("No players match your search."),
                             modifier = Modifier.fillMaxWidth().padding(24.dp)
                         )
                     }
                 }
             }
         }
+    }
+    val continueSection: @Composable () -> Unit = {
+        // Only a warning; the count itself is in the summary at the top.
+        when {
+            summary.selectedCount == 0 -> tr("Select at least one player.")
+            summary.selectedCount < current.playersOnPitch ->
+                tr("Select {selectedCount} more for a full {playersOnPitch}v{playersOnPitch} lineup, or continue with fewer.", "selectedCount" to (current.playersOnPitch - summary.selectedCount), "playersOnPitch" to current.playersOnPitch)
+            else -> null
+        }?.let { warning ->
+            Text(
+                warning,
+                color = if (summary.selectedCount == 0) MaterialTheme.colorScheme.error
+                else MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
+        AppButton(
+            enabled = summary.canContinue,
+            onClick = { nav.navigate("lineup/$matchId") },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(tr("Continue to lineup"))
+        }
+    }
+
+    if (isLandscape()) {
+        // Held sideways: filters and the continue button on the left, the players beside them.
+        Row(Modifier.fillMaxSize()) {
+            Column(
+                Modifier
+                    .width(320.dp)
+                    .fillMaxHeight()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                controls()
+                continueSection()
+            }
+            VerticalDivider()
+            playerList(Modifier.weight(1f).fillMaxHeight())
+        }
+        return
+    }
+
+    Column(Modifier.fillMaxSize()) {
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) { controls() }
+
+        HorizontalDivider()
+
+        playerList(Modifier.weight(1f).fillMaxWidth())
 
         Surface(shadowElevation = 8.dp) {
             Column(
                 Modifier.fillMaxWidth().padding(12.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                // Only a warning; the count itself is in the summary at the top.
-                when {
-                    summary.selectedCount == 0 -> "Select at least one player."
-                    summary.selectedCount < current.playersOnPitch ->
-                        "Select ${current.playersOnPitch - summary.selectedCount} more for a full ${current.playersOnPitch}v${current.playersOnPitch} lineup, or continue with fewer."
-                    else -> null
-                }?.let { warning ->
-                    Text(
-                        warning,
-                        color = if (summary.selectedCount == 0) MaterialTheme.colorScheme.error
-                        else MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
-                AppButton(
-                    enabled = summary.canContinue,
-                    onClick = { nav.navigate("lineup/$matchId") },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Continue to lineup")
-                }
-            }
+            ) { continueSection() }
         }
     }
 }

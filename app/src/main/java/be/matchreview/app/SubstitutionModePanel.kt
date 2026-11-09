@@ -1,7 +1,10 @@
 package be.matchreview.app
 
+import be.matchreview.app.i18n.tr
+
 import be.matchreview.app.ui.AppButton
 import be.matchreview.app.ui.AppOutlinedButton
+import be.matchreview.app.ui.isLandscape
 import android.os.SystemClock
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -24,7 +27,7 @@ import be.matchreview.app.data.GameMatch
 import be.matchreview.app.data.MatchLineupPlacement
 import be.matchreview.app.data.Player
 import be.matchreview.app.domain.FormationLayout
-import be.matchreview.app.domain.LineupDragDropRules
+import be.matchreview.app.domain.PitchOrientation
 import be.matchreview.app.domain.PlayingTimeRules
 import be.matchreview.app.domain.SubstitutionDrop
 import be.matchreview.app.domain.SubstitutionPlanRules
@@ -77,6 +80,7 @@ internal fun SubstitutionModePanel(
     val haptics = LocalHapticFeedback.current
     val density = LocalDensity.current
     val playerHitRadiusPx = with(density) { 40.dp.toPx() }
+    val landscape = isLandscape()
 
     val slots = remember(match.formation, match.playersOnPitch) {
         FormationLayout.slots(match.formation, match.playersOnPitch)
@@ -102,12 +106,13 @@ internal fun SubstitutionModePanel(
     fun dropAt(playerId: Long, pointer: Offset): SubstitutionDrop? {
         val pitch = pitchBounds ?: return null
         if (!pitch.contains(pointer)) return null
-        val (x, y) = LineupDragDropRules.normalize(
-            pointer.x, pointer.y, pitch.left, pitch.top, pitch.width, pitch.height
+        val (x, y) = PitchOrientation.normalizePointer(
+            pointer.x, pointer.y, pitch.left, pitch.top, pitch.width, pitch.height, landscape
         )
+        val (acrossPx, alongPx) = PitchOrientation.lineupAxes(pitch.width, pitch.height, landscape)
         return SubstitutionPlanRules.resolveDrop(
             plan, playerId, x, y, slots, match.playersOnPitch,
-            pitch.width, pitch.height, playerHitRadiusPx
+            acrossPx, alongPx, playerHitRadiusPx
         )
     }
 
@@ -159,23 +164,104 @@ internal fun SubstitutionModePanel(
     val swapTarget = (preview as? SubstitutionDrop.Swap)?.targetPlayerId
     val snapSlot = (preview as? SubstitutionDrop.Place)?.drop?.takeIf { it.snapped }?.formationSlot
 
+    val pitchView: @Composable (Modifier) -> Unit = { modifier ->
+        PitchView(
+            slots = slots,
+            placements = onPitch,
+            playersById = playersById,
+            draggingPlayerId = drag?.playerId,
+            highlightedSlotId = snapSlot,
+            isDropTarget = pitchIsTarget,
+            onBoundsChanged = { pitchBounds = it },
+            onPlayerClick = ::tapPlayer,
+            onNudge = { playerId, dx, dy ->
+                plan[playerId]?.let { existing ->
+                    plan = plan + (playerId to existing.copy(
+                        normalizedX = (existing.normalizedX + dx).coerceIn(0.08f, 0.92f),
+                        normalizedY = (existing.normalizedY + dy).coerceIn(0.08f, 0.92f),
+                        formationSlot = ""
+                    ))
+                }
+            },
+            onDragStart = { playerId, pointer ->
+                selectedId = null
+                drag = SubstitutionDrag(playerId, pointer)
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+            },
+            onDragMove = { pointer -> drag = drag?.copy(pointerInRoot = pointer) },
+            onDragEnd = ::finishDrag,
+            onDragCancel = { drag = null },
+            subtitleFor = minutesLabel,
+            highlightedPlayerId = swapTarget ?: selectedId,
+            dropHint = swapTarget?.let { tr("Swap with {it}", "it" to (playersById[it]?.name ?: "player")) },
+            horizontal = landscape,
+            modifier = modifier.padding(horizontal = 2.dp, vertical = 2.dp)
+        )
+    }
+    val benchPanel: @Composable (Modifier) -> Unit = { modifier ->
+        BenchPanel(
+            players = bench,
+            draggingPlayerId = drag?.playerId,
+            isDropTarget = benchIsTarget,
+            onBoundsChanged = { benchBounds = it },
+            onPlayerClick = ::tapPlayer,
+            onDragStart = { playerId, pointer ->
+                selectedId = null
+                drag = SubstitutionDrag(playerId, pointer)
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+            },
+            onDragMove = { pointer -> drag = drag?.copy(pointerInRoot = pointer) },
+            onDragEnd = ::finishDrag,
+            onDragCancel = { drag = null },
+            subtitleFor = { id -> if (canMove(id)) minutesLabel(id) else tr("Out") },
+            canDrag = ::canMove,
+            highlightFor = { it in leastPlayedBench },
+            vertical = landscape,
+            modifier = modifier
+        )
+    }
+    val cancelButton: @Composable (Modifier) -> Unit = { modifier ->
+        AppOutlinedButton(
+            onClick = onCancel,
+            enabled = drag == null,
+            modifier = modifier.heightIn(min = 48.dp)
+        ) { Text(if (changes.isEmpty) tr("Close") else tr("Discard")) }
+    }
+    val confirmButton: @Composable (Modifier) -> Unit = { modifier ->
+        AppButton(
+            onClick = { if (changes.isEmpty) onCancel() else onConfirm(plan.values.toList()) },
+            enabled = drag == null,
+            modifier = modifier.heightIn(min = 48.dp)
+        ) {
+            Text(
+                when {
+                    changes.isEmpty -> tr("Done")
+                    changes.hasSubstitutions ->
+                        tr("Confirm {outgoing} change(s)", "outgoing" to (maxOf(changes.incoming.size, changes.outgoing.size)))
+                    else -> tr("Confirm positions")
+                },
+                maxLines = 1
+            )
+        }
+    }
+
     Column(modifier) {
         Row(
             Modifier.fillMaxWidth().heightIn(min = 36.dp).padding(horizontal = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text("Substitutions", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            Text(tr("Substitutions"), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
             Text(
                 when {
-                    selectedId != null -> "Tap a player to swap with ${playersById[selectedId]?.name ?: "player"}"
-                    changes.isEmpty -> "Drag a substitute onto a player"
+                    selectedId != null -> tr("Tap a player to swap with {selected}", "selected" to (playersById[selectedId]?.name ?: "player"))
+                    changes.isEmpty -> tr("Drag a substitute onto a player")
                     else -> listOfNotNull(
                         changes.incoming.takeIf { it.isNotEmpty() }
-                            ?.joinToString(prefix = "▲ ") { playersById[it]?.name?.substringBefore(" ") ?: "Player" },
+                            ?.joinToString(prefix = "▲ ") { playersById[it]?.name?.substringBefore(" ") ?: tr("Player") },
                         changes.outgoing.takeIf { it.isNotEmpty() }
-                            ?.joinToString(prefix = "▼ ") { playersById[it]?.name?.substringBefore(" ") ?: "Player" },
-                        changes.moved.takeIf { it.isNotEmpty() }?.let { "${it.size} moved" }
+                            ?.joinToString(prefix = "▼ ") { playersById[it]?.name?.substringBefore(" ") ?: tr("Player") },
+                        changes.moved.takeIf { it.isNotEmpty() }?.let { tr("{count} moved", "count" to it.size) }
                     ).joinToString("  ")
                 },
                 style = MaterialTheme.typography.labelMedium,
@@ -192,56 +278,22 @@ internal fun SubstitutionModePanel(
                 .fillMaxWidth()
                 .onGloballyPositioned { panelOrigin = it.boundsInRoot().topLeft }
         ) {
-            Column(Modifier.fillMaxSize()) {
-                PitchView(
-                    slots = slots,
-                    placements = onPitch,
-                    playersById = playersById,
-                    draggingPlayerId = drag?.playerId,
-                    highlightedSlotId = snapSlot,
-                    isDropTarget = pitchIsTarget,
-                    onBoundsChanged = { pitchBounds = it },
-                    onPlayerClick = ::tapPlayer,
-                    onNudge = { playerId, dx, dy ->
-                        plan[playerId]?.let { existing ->
-                            plan = plan + (playerId to existing.copy(
-                                normalizedX = (existing.normalizedX + dx).coerceIn(0.08f, 0.92f),
-                                normalizedY = (existing.normalizedY + dy).coerceIn(0.08f, 0.92f),
-                                formationSlot = ""
-                            ))
-                        }
-                    },
-                    onDragStart = { playerId, pointer ->
-                        selectedId = null
-                        drag = SubstitutionDrag(playerId, pointer)
-                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                    },
-                    onDragMove = { pointer -> drag = drag?.copy(pointerInRoot = pointer) },
-                    onDragEnd = ::finishDrag,
-                    onDragCancel = { drag = null },
-                    subtitleFor = minutesLabel,
-                    highlightedPlayerId = swapTarget ?: selectedId,
-                    dropHint = swapTarget?.let { "Swap with ${playersById[it]?.name ?: "player"}" },
-                    modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 2.dp, vertical = 2.dp)
-                )
-                BenchPanel(
-                    players = bench,
-                    draggingPlayerId = drag?.playerId,
-                    isDropTarget = benchIsTarget,
-                    onBoundsChanged = { benchBounds = it },
-                    onPlayerClick = ::tapPlayer,
-                    onDragStart = { playerId, pointer ->
-                        selectedId = null
-                        drag = SubstitutionDrag(playerId, pointer)
-                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                    },
-                    onDragMove = { pointer -> drag = drag?.copy(pointerInRoot = pointer) },
-                    onDragEnd = ::finishDrag,
-                    onDragCancel = { drag = null },
-                    subtitleFor = { id -> if (canMove(id)) minutesLabel(id) else "Out" },
-                    canDrag = ::canMove,
-                    highlightFor = { it in leastPlayedBench }
-                )
+            if (landscape) {
+                // Held sideways: the pitch lies on its side with the bench and buttons beside it.
+                Row(Modifier.fillMaxSize()) {
+                    pitchView(Modifier.weight(1f).fillMaxHeight())
+                    Column(
+                        Modifier.width(212.dp).fillMaxHeight().padding(end = 6.dp, top = 2.dp, bottom = 4.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        benchPanel(Modifier.weight(1f).fillMaxWidth())
+                        confirmButton(Modifier.fillMaxWidth())
+                        cancelButton(Modifier.fillMaxWidth())
+                    }
+                }
+            } else Column(Modifier.fillMaxSize()) {
+                pitchView(Modifier.weight(1f).fillMaxWidth())
+                benchPanel(Modifier)
             }
 
             drag?.let { current ->
@@ -261,31 +313,13 @@ internal fun SubstitutionModePanel(
             }
         }
 
-        Row(
+        if (!landscape) Row(
             Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            AppOutlinedButton(
-                onClick = onCancel,
-                enabled = drag == null,
-                modifier = Modifier.weight(1f).heightIn(min = 48.dp)
-            ) { Text(if (changes.isEmpty) "Close" else "Discard") }
-            AppButton(
-                onClick = { if (changes.isEmpty) onCancel() else onConfirm(plan.values.toList()) },
-                enabled = drag == null,
-                modifier = Modifier.weight(1.4f).heightIn(min = 48.dp)
-            ) {
-                Text(
-                    when {
-                        changes.isEmpty -> "Done"
-                        changes.hasSubstitutions ->
-                            "Confirm ${maxOf(changes.incoming.size, changes.outgoing.size)} change(s)"
-                        else -> "Confirm positions"
-                    },
-                    maxLines = 1
-                )
-            }
+            cancelButton(Modifier.weight(1f))
+            confirmButton(Modifier.weight(1.4f))
         }
     }
 }

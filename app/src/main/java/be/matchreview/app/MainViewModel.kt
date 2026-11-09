@@ -1,5 +1,7 @@
 package be.matchreview.app
 
+import be.matchreview.app.i18n.tr
+
 import android.app.Application
 import android.net.Uri
 import android.os.SystemClock
@@ -20,10 +22,16 @@ import be.matchreview.app.domain.PlayerSeasonStats
 import be.matchreview.app.domain.StatAdjustments
 import be.matchreview.app.domain.StatLine
 import be.matchreview.app.domain.BackupReminderRules
+import be.matchreview.app.domain.PeriodResume
+import be.matchreview.app.domain.RecordingStopMode
+import be.matchreview.app.recording.MatchRecordingService
 import be.matchreview.app.ui.ThemeMode
+import be.matchreview.app.i18n.AppLanguage
+import be.matchreview.app.i18n.LanguageSettings
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -35,6 +43,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = matchReviewApplication.repository
     private val backupManager = matchReviewApplication.backupManager
     private val liveCommandGate = LiveCommandGate()
+    private val periodRecording = matchReviewApplication.periodRecording
 
     private val _backupOperation = MutableStateFlow<BackupOperationState>(BackupOperationState.Idle)
     val backupOperation: StateFlow<BackupOperationState> = _backupOperation.asStateFlow()
@@ -85,6 +94,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun runAutoBackupNow() = autoBackup.runInBackground()
 
+    /** The newest automatic backup, to send to Drive, e-mail or another app. */
+    suspend fun latestAutoBackup(): Uri? = autoBackup.latestBackup()
+
     private val displayPreferences =
         application.getSharedPreferences("matchreview_display", 0)
     private val _themeMode = MutableStateFlow(ThemeMode.fromName(displayPreferences.getString("theme", null)))
@@ -94,6 +106,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         displayPreferences.edit().putString("theme", mode.name).apply()
         _themeMode.value = mode
     }
+
+    val language: StateFlow<AppLanguage> = LanguageSettings.selected
+
+    /** Switches the app's language right away; screens follow without restarting. */
+    fun setLanguage(language: AppLanguage) = LanguageSettings.choose(getApplication(), language)
 
     private val draftPreferences =
         application.getSharedPreferences("matchreview_live_drafts", 0)
@@ -187,7 +204,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         repository.teamStatEvents(teamId)
     ) { teams, matches, stats, events ->
         SeasonReportRules.build(
-            teams.firstOrNull { it.id == teamId }?.name ?: "Team",
+            teams.firstOrNull { it.id == teamId }?.name ?: tr("Team"),
             matches.filter { it.teamId == teamId },
             stats,
             events
@@ -415,15 +432,44 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         repository.resumeMatchClock(matchId, now, System.currentTimeMillis())
     }
 
+    /** When the camera stops by itself; all but manual restart with the next period. */
+    val recordingStopMode: StateFlow<RecordingStopMode> = periodRecording.mode
+    /** A recording stopped at a period end that restarts when the next period starts. */
+    val pendingPeriodRecording: StateFlow<PeriodResume?> = periodRecording.pending
+
+    fun setRecordingStopMode(mode: RecordingStopMode) = periodRecording.setMode(mode)
+
     fun endCurrentPeriod(matchId: Long) = viewModelScope.launch {
+        val stopCamera = periodRecording.prepareForPeriodEnd(matchId)
         repository.endCurrentPeriod(matchId, SystemClock.elapsedRealtime(), System.currentTimeMillis())
+        if (!stopCamera) return@launch
+        val ended = repository.match(matchId).first()
+        if (ended?.status == MatchStatus.PERIOD_ENDED) {
+            // The clip ends exactly at the period end; the break is not filmed.
+            MatchRecordingService.requestStop(getApplication(), ended.accumulatedMatchTimeMs)
+        } else {
+            periodRecording.cancel(matchId)
+        }
     }
 
     fun startNextPeriod(matchId: Long) = viewModelScope.launch {
-        repository.startNextPeriod(matchId, SystemClock.elapsedRealtime(), System.currentTimeMillis())
+        val startedAt = SystemClock.elapsedRealtime()
+        repository.startNextPeriod(matchId, startedAt, System.currentTimeMillis())
+        val started = repository.match(matchId).first()
+        // Runs in the application scope: waiting for the previous clip to be saved must
+        // not be cut short when the live screen closes.
+        matchReviewApplication.applicationScope.launch {
+            periodRecording.resumeAfterPeriodStart(
+                matchId = matchId,
+                status = started?.status,
+                periodStartMatchMs = started?.accumulatedMatchTimeMs ?: 0L,
+                periodStartedMonotonicMs = startedAt
+            )
+        }
     }
 
     fun finishLiveMatch(matchId: Long, done: () -> Unit = {}) = viewModelScope.launch {
+        periodRecording.cancel(matchId)
         val finishedAt = System.currentTimeMillis()
         repository.finishLiveMatch(matchId, SystemClock.elapsedRealtime(), finishedAt)
         backupPreferences.edit().putLong("last_finished_match_epoch_ms", finishedAt).apply()
@@ -543,7 +589,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun exportBackup(uri: Uri, password: String, includeMedia: Boolean) {
         if (_backupOperation.value is BackupOperationState.Working) return
         viewModelScope.launch {
-            _backupOperation.value = BackupOperationState.Working("Creating encrypted backup…")
+            _backupOperation.value = BackupOperationState.Working(tr("Creating encrypted backup…"))
             _backupOperation.value = runCatching {
                 backupManager.exportBackup(uri, password.toCharArray(), includeMedia)
             }.fold(
@@ -555,9 +601,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         .apply()
                     _lastBackupEpochMs.value = completedAt
                     _lastBackupIncludedMedia.value = includeMedia
-                    BackupOperationState.Success("Backup created", it)
+                    BackupOperationState.Success(tr("Backup created"), it)
                 },
-                onFailure = { BackupOperationState.Error(it.message ?: "Backup failed.") }
+                onFailure = { BackupOperationState.Error(it.message ?: tr("Backup failed.")) }
             )
         }
     }
@@ -571,7 +617,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }.fold(
                 onSuccess = { RestorePreviewState.Ready(it) },
                 onFailure = {
-                    RestorePreviewState.Error(it.message ?: "The backup could not be inspected.")
+                    RestorePreviewState.Error(it.message ?: tr("The backup could not be inspected."))
                 }
             )
         }
@@ -585,12 +631,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (_backupOperation.value is BackupOperationState.Working) return
         _restorePreview.value = RestorePreviewState.Idle
         viewModelScope.launch {
-            _backupOperation.value = BackupOperationState.Working("Validating and restoring backup…")
+            _backupOperation.value = BackupOperationState.Working(tr("Validating and restoring backup…"))
             _backupOperation.value = runCatching {
                 backupManager.restoreBackup(uri, password.toCharArray())
             }.fold(
-                onSuccess = { BackupOperationState.Success("Backup restored", it) },
-                onFailure = { BackupOperationState.Error(it.message ?: "Restore failed.") }
+                onSuccess = { BackupOperationState.Success(tr("Backup restored"), it) },
+                onFailure = { BackupOperationState.Error(it.message ?: tr("Restore failed.")) }
             )
         }
     }

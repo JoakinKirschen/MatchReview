@@ -1,5 +1,7 @@
 package be.matchreview.app
 
+import be.matchreview.app.i18n.tr
+
 import be.matchreview.app.ui.AppCard
 import be.matchreview.app.ui.AppButtons
 import be.matchreview.app.ui.AppButton
@@ -50,8 +52,8 @@ fun MatchReadinessScreen(
     }
     val freeStorageLabel = when {
         freeBytes >= 1024L * 1024L * 1024L ->
-            "${freeBytes / (1024L * 1024L * 1024L)} GB free"
-        else -> "${freeBytes / (1024L * 1024L)} MB free"
+            tr("{size} GB free", "size" to (freeBytes / (1024L * 1024L * 1024L)))
+        else -> tr("{size} MB free", "size" to (freeBytes / (1024L * 1024L)))
     }
     val fullLineup = starters.size == current.playersOnPitch
 
@@ -63,27 +65,27 @@ fun MatchReadinessScreen(
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        "${selectedPlayers.size} selected • ${starters.size}/${current.playersOnPitch} starting",
+                        tr("{selectedPlayersCount} selected • {startersCount}/{playersOnPitch} starting", "selectedPlayersCount" to selectedPlayers.size, "startersCount" to starters.size, "playersOnPitch" to current.playersOnPitch),
                         style = MaterialTheme.typography.titleMedium,
                         modifier = Modifier.weight(1f)
                     )
-                    TextButton(onClick = { showDetailsEditor = true }) { Text("Edit") }
+                    TextButton(onClick = { showDetailsEditor = true }) { Text(tr("Edit")) }
                 }
-                ReadinessRow("Opponent", current.opponent)
-                ReadinessRow("Format", "${current.playersOnPitch}v${current.playersOnPitch}")
-                ReadinessRow("Formation", current.formation)
-                ReadinessRow("Timing", "${current.periodCount} × ${current.periodDurationMinutes} min")
-                ReadinessRow("Venue", current.venue.ifBlank { "Not specified" })
-                ReadinessRow("Date", current.matchDate)
-                ReadinessRow("Home or away", if (current.isHome) "Home" else "Away")
-                ReadinessRow("Competition", current.competition.ifBlank { "Not specified" })
-                ReadinessRow("Storage", freeStorageLabel)
+                ReadinessRow(tr("Opponent"), current.opponent)
+                ReadinessRow(tr("Format"), "${current.playersOnPitch}v${current.playersOnPitch}")
+                ReadinessRow(tr("Formation"), current.formation)
+                ReadinessRow(tr("Timing"), tr("{periodCount} × {minutes} min", "periodCount" to current.periodCount, "minutes" to current.periodDurationMinutes))
+                ReadinessRow(tr("Venue"), current.venue.ifBlank { tr("Not specified") })
+                ReadinessRow(tr("Date"), current.matchDate)
+                ReadinessRow(tr("Home or away"), if (current.isHome) tr("Home") else tr("Away"))
+                ReadinessRow(tr("Competition"), current.competition.ifBlank { tr("Not specified") })
+                ReadinessRow(tr("Storage"), freeStorageLabel)
             }
         }
 
         listOfNotNull(
-            "The starting lineup is not full".takeIf { !fullLineup },
-            "No goalkeeper in the starting lineup".takeIf { !goalkeeperReady }
+            tr("The starting lineup is not full").takeIf { !fullLineup },
+            tr("No goalkeeper in the starting lineup").takeIf { !goalkeeperReady }
         ).forEach { warning ->
             Surface(
                 color = MaterialTheme.colorScheme.errorContainer,
@@ -95,7 +97,7 @@ fun MatchReadinessScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(warning, modifier = Modifier.weight(1f))
-                    TextButton(onClick = { nav.navigate("lineup/$matchId") }) { Text("Fix") }
+                    TextButton(onClick = { nav.navigate("lineup/$matchId") }) { Text(tr("Fix")) }
                 }
             }
         }
@@ -103,7 +105,7 @@ fun MatchReadinessScreen(
         AppOutlinedButton(
             onClick = { nav.navigate("lineup/$matchId") },
             modifier = Modifier.fillMaxWidth()
-        ) { Text("Review lineup") }
+        ) { Text(tr("Review lineup")) }
         AppButton(
             onClick = {
                 nav.navigate("live/$matchId") {
@@ -112,7 +114,7 @@ fun MatchReadinessScreen(
             },
             enabled = starters.isNotEmpty(),
             modifier = Modifier.fillMaxWidth().heightIn(min = AppButtons.LargeHeight)
-        ) { Text("Open match day") }
+        ) { Text(tr("Open match day")) }
     }
 
     if (showDetailsEditor) {

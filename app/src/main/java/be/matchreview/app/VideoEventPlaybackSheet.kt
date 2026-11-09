@@ -1,5 +1,7 @@
 package be.matchreview.app
 
+import be.matchreview.app.i18n.tr
+
 import be.matchreview.app.ui.AppButton
 import be.matchreview.app.ui.AppOutlinedButton
 import android.net.Uri
@@ -16,6 +18,7 @@ import androidx.media3.ui.PlayerView
 import be.matchreview.app.data.MatchEvent
 import be.matchreview.app.data.Player
 import be.matchreview.app.data.RecordingSegment
+import be.matchreview.app.domain.MatchActions
 import be.matchreview.app.domain.MatchClockCalculator
 import be.matchreview.app.domain.VideoEventRules
 
@@ -62,7 +65,7 @@ fun VideoEventPlaybackSheet(
             Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Text("Event video", style = MaterialTheme.typography.headlineSmall)
+            Text(tr("Event video"), style = MaterialTheme.typography.headlineSmall)
             AndroidView(
                 factory = { ctx -> PlayerView(ctx).apply { this.player = player } },
                 update = { it.player = player },
@@ -70,8 +73,8 @@ fun VideoEventPlaybackSheet(
             )
             Text(eventPlaybackTitle(selected, playersById), style = MaterialTheme.typography.titleMedium)
             Text(
-                "Match ${MatchClockCalculator.formatClock(selected.timestampMs)} • " +
-                    "clip +${MatchClockCalculator.formatClock(selected.recordingOffsetMs ?: 0L)}",
+                tr("Match {time} • ", "time" to (MatchClockCalculator.formatClock(selected.timestampMs))) +
+                    tr("clip +{time}", "time" to (MatchClockCalculator.formatClock(selected.recordingOffsetMs ?: 0L))),
                 style = MaterialTheme.typography.bodySmall
             )
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -79,26 +82,32 @@ fun VideoEventPlaybackSheet(
                     onClick = { selectedId = playableEvents[selectedIndex - 1].id },
                     enabled = selectedIndex > 0,
                     modifier = Modifier.weight(1f)
-                ) { Text("Previous event") }
+                ) { Text(tr("Previous event")) }
                 AppButton(
                     onClick = { selectedId = playableEvents[selectedIndex + 1].id },
                     enabled = selectedIndex >= 0 && selectedIndex < playableEvents.lastIndex,
                     modifier = Modifier.weight(1f)
-                ) { Text("Next event") }
+                ) { Text(tr("Next event")) }
             }
-            TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) { Text("Close") }
+            TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) { Text(tr("Close")) }
         }
     }
 }
 
-private fun eventPlaybackTitle(event: MatchEvent, playersById: Map<Long, Player>): String =
+internal fun eventPlaybackTitle(event: MatchEvent, playersById: Map<Long, Player>): String =
     when (event.type) {
-        "OUR_GOAL" -> "Goal • ${playersById[event.playerId]?.name ?: "Unknown scorer"}"
-        "OPPONENT_GOAL" -> "Opponent goal"
-        "SUBSTITUTION" -> "Substitution • ${playersById[event.playerId]?.name ?: "Player"} off"
-        "PLAYER_ON" -> "${playersById[event.playerId]?.name ?: "Player"} entered"
-        "PLAYER_OFF" -> "${playersById[event.playerId]?.name ?: "Player"} left"
-        "INJURY_OFF" -> "Injury • ${playersById[event.playerId]?.name ?: "Player"}"
-        "DISMISSAL" -> "Dismissal • ${playersById[event.playerId]?.name ?: "Player"}"
-        else -> event.type.lowercase().replace('_', ' ').replaceFirstChar { it.uppercase() }
+        "OUR_GOAL" -> tr("Goal • {player}", "player" to (playersById[event.playerId]?.name ?: tr("Unknown scorer")))
+        "OPPONENT_GOAL" -> tr("Opponent goal")
+        "SUBSTITUTION" -> tr("Substitution • {player} off", "player" to (playersById[event.playerId]?.name ?: tr("Player")))
+        "PLAYER_ON" -> tr("{player} entered", "player" to (playersById[event.playerId]?.name ?: tr("Player")))
+        "PLAYER_OFF" -> tr("{player} left", "player" to (playersById[event.playerId]?.name ?: tr("Player")))
+        "INJURY_OFF" -> tr("Injury • {player}", "player" to (playersById[event.playerId]?.name ?: tr("Player")))
+        "DISMISSAL" -> tr("Dismissal • {player}", "player" to (playersById[event.playerId]?.name ?: tr("Player")))
+        "KEEPER_SAVE" -> tr("Save • {player}", "player" to (playersById[event.playerId]?.name ?: tr("Keeper")))
+        "KICK_OFF" -> tr("Kick-off")
+        else -> MatchActions.label(event.type)?.let { label ->
+            val who = playersById[event.playerId]?.name
+                ?: if (MatchActions.isOpponent(event.type)) "opponent" else null
+            listOfNotNull(label, who).joinToString(" • ")
+        } ?: event.type.lowercase().replace('_', ' ').replaceFirstChar { it.uppercase() }
     }

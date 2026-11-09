@@ -3,12 +3,15 @@ package be.matchreview.app
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import androidx.activity.ComponentActivity
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
@@ -34,7 +37,10 @@ import org.robolectric.annotation.GraphicsMode
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(qualifiers = "w360dp-h760dp-hdpi")
-class ScreenshotTest {
+open class ScreenshotTest {
+    /** Added to every file name, so other screen shapes do not overwrite these. */
+    protected open val namePrefix = ""
+
     @get:Rule
     val compose = createAndroidComposeRule<ComponentActivity>()
 
@@ -79,6 +85,14 @@ class ScreenshotTest {
         repository.recordKeeperSave(finishedId, players[0].id, start + 500_000, wall + 500_000)
         repository.recordOpponentGoal(finishedId, start + 700_000, wall + 700_000)
         repository.recordOurGoal(finishedId, players[6].id, null, start + 820_000, wall + 820_000)
+        // Two saved clips, so the full match video has something to list.
+        listOf(0L to 420_000L, 420_000L to 480_000L).forEach { (clockStart, duration) ->
+            val clip = repository.beginRecordingSegment(finishedId, clockStart, 90, audioEnabled = false)
+            repository.markRecordingStarted(clip, wall + clockStart)
+            repository.completeRecordingSegment(
+                clip, "content://media/external/video/media/$clip", clockStart + duration, duration, 50_000_000L
+            )
+        }
         repository.finishLiveMatch(finishedId, start + 900_000, wall + 900_000)
 
         val liveId = match("City Juniors", "2026-10-03")
@@ -91,11 +105,11 @@ class ScreenshotTest {
         Ids(teamId, finishedId, liveId, upcomingId)
     }
 
-    private fun show(route: String?) {
+    private fun show(route: String?, theme: ThemeMode = ThemeMode.LIGHT) {
         compose.mainClock.autoAdvance = false
         compose.setContent {
             val vm = remember { MainViewModel(app) }
-            MatchReviewTheme(ThemeMode.LIGHT) { MatchReviewApp(vm, initialRoute = route) }
+            MatchReviewTheme(theme) { MatchReviewApp(vm, initialRoute = route) }
         }
         settle()
     }
@@ -109,19 +123,39 @@ class ScreenshotTest {
         }
     }
 
+    /** Clicks the English [text] in the language being shown. */
     private fun click(text: String) {
-        compose.onAllNodesWithText(text).onFirst().performClick()
+        compose.onAllNodesWithText(be.matchreview.app.i18n.tr(text)).onFirst().performClick()
         settle(40)
     }
 
-    private fun capture(name: String) {
+    private fun hideTextureViews(view: android.view.View) {
+        if (view is android.view.TextureView) view.visibility = android.view.View.INVISIBLE
+        if (view is android.view.ViewGroup) (0 until view.childCount).forEach { hideTextureViews(view.getChildAt(it)) }
+    }
+
+    /** The newest window on screen, such as an open dialog. */
+    private fun topmostWindow(): android.view.View {
+        val global = Class.forName("android.view.WindowManagerGlobal")
+        val instance = global.getMethod("getInstance").invoke(null)
+        val views = global.getDeclaredField("mViews").apply { isAccessible = true }.get(instance) as List<*>
+        return views.last() as android.view.View
+    }
+
+    /** [topmost] captures the newest window, such as an open dialog. */
+    private fun capture(name: String, topmost: Boolean = false) {
         settle(20)
-        val bitmap = runCatching { compose.onRoot().captureToImage().asAndroidBitmap() }.getOrElse {
-            val view = compose.activity.window.decorView
+        val bitmap = runCatching {
+            (if (topmost) compose.onAllNodes(isRoot()).onLast() else compose.onRoot())
+                .captureToImage().asAndroidBitmap()
+        }.getOrElse {
+            val view = if (topmost) topmostWindow() else compose.activity.window.decorView
+            // A TextureView (the video picture) only draws on the GPU; leave it blank here.
+            hideTextureViews(view)
             Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888).also { view.draw(Canvas(it)) }
         }
         val directory = File("build/screenshots").apply { mkdirs() }
-        File(directory, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        File(directory, "$namePrefix$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
 
     @Test fun dashboard() { fixture(); show(null); capture("01-dashboard") }
@@ -143,10 +177,40 @@ class ScreenshotTest {
     @Test fun liveMatch() { val ids = fixture(); show("live/${ids.liveId}"); capture("09-live-match") }
 
     @Test
+    fun liveMatchOutdoor() {
+        val ids = fixture()
+        show("live/${ids.liveId}", ThemeMode.OUTDOOR)
+        capture("09b-live-match-outdoor")
+    }
+
+    /** The live screen has the least room for longer words, so it is checked in every language. */
+    @Test
+    fun liveMatchInEveryLanguage() {
+        assumeTrue(namePrefix.isEmpty())
+        val ids = fixture()
+        val language = mutableStateOf(be.matchreview.app.i18n.AppLanguage.ENGLISH)
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            val vm = remember { MainViewModel(app) }
+            MatchReviewTheme(ThemeMode.LIGHT) { MatchReviewApp(vm, initialRoute = "live/${ids.liveId}") }
+        }
+        settle()
+        be.matchreview.app.i18n.AppLanguage.entries
+            .filter { it != be.matchreview.app.i18n.AppLanguage.SYSTEM }
+            .forEach {
+                be.matchreview.app.i18n.I18n.apply(it)
+                capture("lang-${it.code}-live-match")
+            }
+        be.matchreview.app.i18n.I18n.apply(be.matchreview.app.i18n.AppLanguage.ENGLISH)
+    }
+
+    @Test
     fun liveCamera() {
         val ids = fixture()
         show("live/${ids.liveId}")
-        click(app.getString(R.string.camera_tab))
+        // Tablets show the camera beside the pitch, without a camera tab.
+        val cameraTab = "Camera"
+        if (compose.onAllNodesWithText(cameraTab).fetchSemanticsNodes().isNotEmpty()) click(cameraTab)
         capture("10-live-camera")
     }
 
@@ -154,7 +218,7 @@ class ScreenshotTest {
     fun liveTimeline() {
         val ids = fixture()
         show("live/${ids.liveId}")
-        click(app.getString(R.string.timeline_tab))
+        click("Timeline")
         capture("11-live-timeline")
     }
 
@@ -169,4 +233,44 @@ class ScreenshotTest {
     @Test fun review() { val ids = fixture(); show("review/${ids.finishedId}"); capture("13-review") }
 
     @Test fun backup() { fixture(); show("backup"); capture("14-backup") }
+
+    @Test
+    fun fullMatchVideo() {
+        val ids = fixture()
+        show("review/${ids.finishedId}")
+        click("Video")
+        capture("15-review-video")
+        click("Watch full match")
+        capture("16-full-match-video", topmost = true)
+    }
+}
+
+/** The same screens on a phone held sideways. */
+@RunWith(AndroidJUnit4::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(qualifiers = "w760dp-h360dp-land-hdpi")
+class LandscapeScreenshotTest : ScreenshotTest() {
+    override val namePrefix = "land-"
+}
+
+/** A 10-inch tablet held sideways, where the camera sits beside the pitch. */
+@RunWith(AndroidJUnit4::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(qualifiers = "w1280dp-h800dp-land-mdpi")
+class TabletScreenshotTest : ScreenshotTest() {
+    override val namePrefix = "tablet-"
+}
+
+/** The main screens in Dutch. */
+@RunWith(AndroidJUnit4::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(qualifiers = "w360dp-h760dp-hdpi")
+class DutchScreenshotTest : ScreenshotTest() {
+    override val namePrefix = "nl-"
+
+    @Before
+    fun dutch() = be.matchreview.app.i18n.I18n.apply(be.matchreview.app.i18n.AppLanguage.DUTCH)
+
+    @org.junit.After
+    fun english() = be.matchreview.app.i18n.I18n.apply(be.matchreview.app.i18n.AppLanguage.ENGLISH)
 }

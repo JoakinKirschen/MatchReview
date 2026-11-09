@@ -1,5 +1,7 @@
 package be.matchreview.app.domain
 
+import be.matchreview.app.i18n.tr
+
 /** Avoids announcing a ticking clock every second to screen-reader users. */
 object LiveAnnouncementRules {
     fun shouldAnnounceClock(previousMs: Long, currentMs: Long): Boolean {
@@ -8,5 +10,5 @@ object LiveAnnouncementRules {
     }
 
     fun scoreAnnouncement(ourScore: Int, opponentScore: Int): String =
-        "Score $ourScore to $opponentScore"
+        tr("Score {ourScore} to {opponentScore}", "ourScore" to ourScore, "opponentScore" to opponentScore)
 }

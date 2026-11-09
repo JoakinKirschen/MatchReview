@@ -1,5 +1,7 @@
 package be.matchreview.app.domain
 
+import be.matchreview.app.i18n.tr
+
 import java.util.Locale
 import kotlin.math.roundToInt
 
@@ -28,7 +30,7 @@ object StorageHealthRules {
 
     fun formatAvailable(bytes: Long): String {
         val gb = bytes.coerceAtLeast(0L) / 1_000_000_000.0
-        return if (gb >= 1.0) String.format(Locale.US, "%.1f GB", gb)
-        else "${(bytes.coerceAtLeast(0L) / 1_000_000.0).roundToInt()} MB"
+        return if (gb >= 1.0) String.format(Locale.US, tr("%.1f GB"), gb)
+        else tr("{size} MB", "size" to ((bytes.coerceAtLeast(0L) / 1_000_000.0).roundToInt()))
     }
 }
