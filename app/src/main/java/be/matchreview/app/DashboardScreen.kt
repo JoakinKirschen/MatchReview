@@ -61,16 +61,29 @@ internal fun DashboardScreen(vm: MainViewModel, nav: NavHostController) {
             }
         }
         item {
+            // Eight choices do not fit side by side: a menu, named in each language itself.
             val language by vm.language.collectAsStateWithLifecycle()
-            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                AppLanguage.entries.forEachIndexed { index, choice ->
-                    SegmentedButton(
-                        selected = language == choice,
-                        onClick = { vm.setLanguage(choice) },
-                        shape = SegmentedButtonDefaults.itemShape(index, AppLanguage.entries.size),
-                        icon = {},
-                        modifier = Modifier.heightIn(min = 48.dp)
-                    ) { Text(choice.label, maxLines = 1) }
+            var languageMenu by remember { mutableStateOf(false) }
+            Box {
+                AppOutlinedButton(
+                    onClick = { languageMenu = true },
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                ) { Text("🌐  ${tr("Language")}: ${language.label} ▾", maxLines = 1) }
+                DropdownMenu(expanded = languageMenu, onDismissRequest = { languageMenu = false }) {
+                    AppLanguage.entries.forEach { choice ->
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    choice.label,
+                                    fontWeight = if (choice == language) FontWeight.Bold else null
+                                )
+                            },
+                            onClick = {
+                                languageMenu = false
+                                vm.setLanguage(choice)
+                            }
+                        )
+                    }
                 }
             }
         }

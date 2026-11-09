@@ -33,7 +33,7 @@ class TranslationCoverageTest {
     /** Texts translated from a variable rather than a literal. */
     private val dynamicTexts =
         ThemeMode.entries.map { it.name.lowercase().replaceFirstChar(Char::uppercase) } +
-            listOf("Report", "Timeline", "Video", "Data", "System", "Home|navigation", "Teams", "Matches") +
+            listOf("Report", "Timeline", "Video", "Data", "System", "Home|navigation", "Teams", "Matches", "Language") +
             listOf("Only when I stop it", "When I end the period", "When the planned time is up") +
             listOf("manual", "at period end", "when time is up") +
             MatchStatus.entries.map { it.name.lowercase().replaceFirstChar(Char::uppercase) } +
@@ -44,16 +44,62 @@ class TranslationCoverageTest {
             listOf("top", "middle", "bottom").flatMap { height -> listOf("left", "centre", "right").map { "$height $it" } }
                 .filter { it != "middle centre" } + "centre"
 
+    private val translated = AppLanguage.entries.filter { it.texts != null }
+
     @Test
-    fun `every text has a Dutch translation`() {
-        val missing = (sourceTexts().keys + dynamicTexts).filter { it !in Dutch.texts }
-        assertTrue("Missing Dutch for:\n" + missing.joinToString("\n"), missing.isEmpty())
+    fun `every text has a translation in every language`() {
+        val needed = sourceTexts().keys + dynamicTexts
+        val missing = translated.flatMap { language ->
+            needed.filter { it !in language.texts!! }.map { "${language.name}: $it" }
+        }
+        assertTrue("Missing translations:\n" + missing.joinToString("\n"), missing.isEmpty())
     }
 
     @Test
     fun `translations keep the same placeholders`() {
-        val wrong = Dutch.texts.filter { (english, dutch) -> I18n.placeholders(english) != I18n.placeholders(dutch) }
-        assertTrue("Placeholders differ:\n" + wrong.entries.joinToString("\n"), wrong.isEmpty())
+        val wrong = translated.flatMap { language ->
+            language.texts!!.filter { (english, text) -> I18n.placeholders(english) != I18n.placeholders(text) }
+                .map { "${language.name}: ${it.key} -> ${it.value}" }
+        }
+        assertTrue("Placeholders differ:\n" + wrong.joinToString("\n"), wrong.isEmpty())
+    }
+
+    /** Real words in a text, leaving out placeholders such as {minutes}. */
+    private fun words(text: String) =
+        Regex("[A-Za-z]{2,}").findAll(text.replace(Regex("\\{[a-zA-Z]+\\}"), "")).count()
+
+    @Test
+    fun `no translation is left in English by accident`() {
+        // Short words such as "Video" or "Pressing" may be the same; whole sentences may not.
+        val untranslated = translated.flatMap { language ->
+            language.texts!!.filter { (english, text) -> english == text && words(english) >= 3 }
+                .map { "${language.name}: ${it.key}" }
+        }
+        assertTrue("Same as English:\n" + untranslated.joinToString("\n"), untranslated.isEmpty())
+    }
+
+    @Test
+    fun `every language switches the texts`() {
+        val expected = mapOf(
+            AppLanguage.FRENCH to "Mode remplacements",
+            AppLanguage.GERMAN to "Wechselmodus",
+            AppLanguage.SPANISH to "Modo cambios",
+            AppLanguage.ITALIAN to "Modalità cambi",
+            AppLanguage.TURKISH to "Değişiklik modu",
+            AppLanguage.DUTCH to "Wisselmodus"
+        )
+        expected.forEach { (language, text) ->
+            I18n.apply(language)
+            assertEquals(text, tr("Substitution mode"))
+        }
+    }
+
+    @Test
+    fun `the phone language picks a supported language or English`() {
+        I18n.apply(AppLanguage.SYSTEM, systemLanguage = "tr")
+        assertEquals(AppLanguage.TURKISH, I18n.current)
+        I18n.apply(AppLanguage.SYSTEM, systemLanguage = "pl")
+        assertEquals(AppLanguage.ENGLISH, I18n.current)
     }
 
     @Test

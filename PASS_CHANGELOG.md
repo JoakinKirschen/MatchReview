@@ -1,7 +1,7 @@
 # MatchReview Pass Changelog
 
 This is the **single source of truth** for implementation-pass notes and change tracking.
-It consolidates implementation notes for Passes 1–66.
+It consolidates implementation notes for Passes 1–67.
 
 ## How to maintain this file
 
@@ -37,7 +37,7 @@ For every future development pass:
 
 | Pass | Status | Planned change | Version impact |
 |---:|---|---|---|
-| 67 | Not scheduled | Add the next approved recommendation here | To be determined |
+| 68 | Not scheduled | Add the next approved recommendation here | To be determined |
 
 ## Documentation changes
 
@@ -1520,4 +1520,22 @@ begin.
 ### Deferred or known limitations
 - Not tried on a real device: camera recording on Android 8/9, notification buttons on the lock screen, pinch zoom and frame stepping on real video, and starting the period restart while the phone is locked.
 - Dutch texts were written without a native-speaker review; terms follow common Flemish youth-football usage ("Goal voor", "Wissel", "Periode").
+
+## Pass 67 — French, German, Spanish, Italian and Turkish
+
+**Status:** Completed  
+**Completed:** 2026-11-09  
+**Version impact:** None (still 1.6.0)
+
+### Added or changed
+- Five more languages, each with all 780 texts (`i18n/French.kt`, `German.kt`, `Spanish.kt`, `Italian.kt`, `Turkish.kt`), in common football wording for each country.
+- `AppLanguage` carries the ISO code and its table; "System" picks the phone's language when supported, otherwise English. Dates and numbers follow the chosen language.
+- The language choice on the home screen is a menu (eight choices no longer fit as buttons), each language named in itself.
+- PDF messages on the review screen no longer depend on the text starting with "PDF".
+
+### Tests and verification
+- `TranslationCoverageTest` checks every language for missing texts, matching placeholders and sentences accidentally left in English; a screenshot test renders the live screen in all seven languages. All 236 unit tests pass.
+
+### Deferred or known limitations
+- The translations were written without native-speaker review. Turkish sentences avoid putting case endings on names, which reads slightly formal.
 

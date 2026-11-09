@@ -109,6 +109,7 @@ internal fun ReviewScreen(matchId: Long, vm: MainViewModel, nav: NavHostControll
     val deleteBlocked = current.status in setOf(MatchStatus.LIVE, MatchStatus.PAUSED) || recordingThisMatch
     var exportContent by remember { mutableStateOf("") }
     var exportMessage by remember { mutableStateOf<String?>(null) }
+    var pdfMessage by remember { mutableStateOf<String?>(null) }
     var redactedExport by rememberSaveable { mutableStateOf(true) }
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("text/csv")
@@ -131,9 +132,9 @@ internal fun ReviewScreen(matchId: Long, vm: MainViewModel, nav: NavHostControll
         ActivityResultContracts.CreateDocument("application/pdf")
     ) { uri ->
         if (uri == null) {
-            exportMessage = tr("PDF download cancelled")
+            pdfMessage = tr("PDF download cancelled")
         } else {
-            exportMessage = runCatching {
+            pdfMessage = runCatching {
                 context.contentResolver.openOutputStream(uri, "w")!!.use(::writeSummaryPdf)
                 // Open the saved summary straight away so it can be checked and shared.
                 if (ExternalApps.open(context, uri, "application/pdf")) tr("PDF summary saved")
@@ -497,7 +498,7 @@ internal fun ReviewScreen(matchId: Long, vm: MainViewModel, nav: NavHostControll
                 ) { Text(tr("Download PDF summary")) }
                 AppOutlinedButton(
                     onClick = {
-                        exportMessage = runCatching {
+                        pdfMessage = runCatching {
                             ExternalApps.shareNewFile(
                                 context,
                                 MatchPdfExporter.fileName(current),
@@ -511,8 +512,8 @@ internal fun ReviewScreen(matchId: Long, vm: MainViewModel, nav: NavHostControll
                     modifier = Modifier.heightIn(min = 48.dp)
                 ) { Text(tr("Share")) }
             }
-            // The Dutch PDF messages start with "PDF" too.
-            exportMessage?.takeIf { it.startsWith("PDF") }?.let {
+            // Messages about the PDF summary, shown under its buttons.
+            pdfMessage?.let {
                 Text(it, style = MaterialTheme.typography.bodySmall)
             }
         }

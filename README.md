@@ -5,7 +5,8 @@ the match from the sideline (clock, goals, substitutions, playing time), film it
 review it afterwards. Everything stays on the phone; nothing is sent to a server.
 
 Current version: **1.6.0** (`versionCode 8`). Android 8.0 (API 26) or newer.
-Languages: English and Dutch (Nederlands), chosen on the home screen or following the phone.
+Languages: English, Dutch, French, German, Spanish, Italian and Turkish, chosen on the home
+screen or following the phone's language.
 
 ## What it does
 
@@ -76,11 +77,13 @@ compile/target SDK 35, Jetpack Compose, Room, CameraX and Media3.
 
 ## Translations
 
-Texts are written in English as `tr("…")`; the Dutch versions are in
-`app/src/main/java/be/matchreview/app/i18n/Dutch.kt`. Values use named placeholders
+Texts are written in English as `tr("…")`; each language has a table keyed by the English
+text in `app/src/main/java/be/matchreview/app/i18n/` (`Dutch.kt`, `French.kt`, `German.kt`,
+`Spanish.kt`, `Italian.kt`, `Turkish.kt`). A new language is a new table plus an entry in
+`AppLanguage`. Values use named placeholders
 (`tr("Period {number}", "number" to 2)`), and a word with two meanings carries a note after
-a bar (`tr("Home|navigation")`). `TranslationCoverageTest` fails when a text has no Dutch
-entry or its placeholders differ.
+a bar (`tr("Home|navigation")`). `TranslationCoverageTest` fails when a text is missing in any
+language, its placeholders differ, or a sentence was left in English.
 
 ## Project documents
 

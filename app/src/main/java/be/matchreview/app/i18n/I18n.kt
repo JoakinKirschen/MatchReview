@@ -6,23 +6,49 @@ import androidx.compose.runtime.setValue
 import java.util.Locale
 
 /** The language the app is shown in; System follows the phone's language. */
-enum class AppLanguage(private val englishLabel: String) {
-    SYSTEM("System"),
+enum class AppLanguage(
+    /** ISO 639-1 code; null for System. */
+    val code: String?,
+    private val nativeName: String
+) {
+    SYSTEM(null, "System"),
     // Each language is named in itself, so it can be found whatever is shown now.
-    ENGLISH("English"),
-    DUTCH("Nederlands");
+    ENGLISH("en", "English"),
+    DUTCH("nl", "Nederlands"),
+    FRENCH("fr", "Français"),
+    GERMAN("de", "Deutsch"),
+    SPANISH("es", "Español"),
+    ITALIAN("it", "Italiano"),
+    TURKISH("tr", "Türkçe");
 
-    val label: String get() = if (this == SYSTEM) tr(englishLabel) else englishLabel
+    val label: String get() = if (this == SYSTEM) tr(nativeName) else nativeName
+
+    /** The translations, keyed by the English text; null for English itself. */
+    internal val texts: Map<String, String>?
+        get() = when (this) {
+            SYSTEM, ENGLISH -> null
+            DUTCH -> Dutch.texts
+            FRENCH -> French.texts
+            GERMAN -> German.texts
+            SPANISH -> Spanish.texts
+            ITALIAN -> Italian.texts
+            TURKISH -> Turkish.texts
+        }
 
     companion object {
         fun fromName(name: String?): AppLanguage = entries.firstOrNull { it.name == name } ?: SYSTEM
+
+        /** The supported language for a phone language code; English when it is not supported. */
+        fun forCode(code: String?): AppLanguage =
+            entries.firstOrNull { it.code != null && it.code == code } ?: ENGLISH
     }
 }
 
 /**
- * Translations keyed by the English text. Code writes `tr("Our goal")`; when Dutch is
- * active the text comes from [Dutch], otherwise (or when a translation is missing) the
- * English text is used. This works in screens, click handlers, services and exports alike.
+ * Translations keyed by the English text. Code writes `tr("Our goal")`; in another
+ * language the text comes from that language's table (for example [Dutch]); when a
+ * translation is missing the English text is used. This works in screens, click handlers,
+ * services and exports alike.
  *
  * Values are put in with named placeholders: `tr("Period {number}", "number" to 2)`.
  * A word with two meanings carries a note after a bar: `tr("Save|keeper")`.
@@ -30,23 +56,28 @@ enum class AppLanguage(private val englishLabel: String) {
  * is Compose state.
  */
 object I18n {
-    private var dutch by mutableStateOf(false)
+    private var active by mutableStateOf(AppLanguage.ENGLISH)
 
-    val isDutch: Boolean get() = dutch
+    /** The language texts are shown in now; never System. */
+    val current: AppLanguage get() = active
+
+    val isDutch: Boolean get() = active == AppLanguage.DUTCH
 
     /** The locale for dates and numbers in the chosen language. */
-    val locale: Locale get() = if (dutch) Locale("nl", "BE") else Locale.getDefault()
+    val locale: Locale
+        get() = when (active) {
+            AppLanguage.DUTCH -> Locale("nl", "BE")
+            AppLanguage.FRENCH -> Locale("fr", "BE")
+            AppLanguage.ENGLISH, AppLanguage.SYSTEM -> Locale.getDefault()
+            else -> Locale(active.code!!)
+        }
 
     fun apply(language: AppLanguage, systemLanguage: String = Locale.getDefault().language) {
-        dutch = when (language) {
-            AppLanguage.SYSTEM -> systemLanguage == "nl"
-            AppLanguage.ENGLISH -> false
-            AppLanguage.DUTCH -> true
-        }
+        active = if (language == AppLanguage.SYSTEM) AppLanguage.forCode(systemLanguage) else language
     }
 
     fun translate(english: String, args: Array<out Pair<String, Any?>>): String {
-        val template = (if (dutch) Dutch.texts[english] else null) ?: english.substringBefore(CONTEXT)
+        val template = active.texts?.get(english) ?: english.substringBefore(CONTEXT)
         return fill(template, args)
     }
 

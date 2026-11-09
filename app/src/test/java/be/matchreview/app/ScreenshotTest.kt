@@ -3,6 +3,7 @@ package be.matchreview.app
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import androidx.activity.ComponentActivity
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.captureToImage
@@ -180,6 +181,27 @@ open class ScreenshotTest {
         val ids = fixture()
         show("live/${ids.liveId}", ThemeMode.OUTDOOR)
         capture("09b-live-match-outdoor")
+    }
+
+    /** The live screen has the least room for longer words, so it is checked in every language. */
+    @Test
+    fun liveMatchInEveryLanguage() {
+        assumeTrue(namePrefix.isEmpty())
+        val ids = fixture()
+        val language = mutableStateOf(be.matchreview.app.i18n.AppLanguage.ENGLISH)
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            val vm = remember { MainViewModel(app) }
+            MatchReviewTheme(ThemeMode.LIGHT) { MatchReviewApp(vm, initialRoute = "live/${ids.liveId}") }
+        }
+        settle()
+        be.matchreview.app.i18n.AppLanguage.entries
+            .filter { it != be.matchreview.app.i18n.AppLanguage.SYSTEM }
+            .forEach {
+                be.matchreview.app.i18n.I18n.apply(it)
+                capture("lang-${it.code}-live-match")
+            }
+        be.matchreview.app.i18n.I18n.apply(be.matchreview.app.i18n.AppLanguage.ENGLISH)
     }
 
     @Test

@@ -5,7 +5,7 @@ package be.matchreview.app.i18n
  * A missing entry shows the English text; TranslationCoverageTest lists any that are missing.
  */
 internal object Dutch {
-    val texts: Map<String, String> = HashMap<String, String>(1558).apply {
+    val texts: Map<String, String> = HashMap<String, String>(1560).apply {
         put(" (assist {value})", " (assist {value})")
         put(" - {time} total", " - {time} in totaal")
         put(" to Movies/MatchReview", " in Movies/MatchReview")
@@ -266,6 +266,7 @@ internal object Dutch {
         put("Keeps match video recording active", "Houdt de opname van de wedstrijdvideo actief")
         put("Kick off • Start period 1", "Aftrap • Periode 1 starten")
         put("Kick-off", "Aftrap")
+        put("Language", "Taal")
         put("Last automatic backup ", "Laatste automatische back-up ")
         put("Last automatic backup failed: {lastError}", "Laatste automatische back-up mislukt: {lastError}")
         put("Last backup excluded videos", "Laatste back-up zonder video's")
