@@ -21,6 +21,7 @@ import be.matchreview.app.data.MatchPeriod
 import be.matchreview.app.data.MatchStatus
 import be.matchreview.app.data.Team
 import be.matchreview.app.domain.LiveClockRules
+import be.matchreview.app.domain.LiveCommandGate
 import be.matchreview.app.domain.MatchClockCalculator
 import be.matchreview.app.domain.PeriodRecordingRules
 import be.matchreview.app.domain.PeriodTimeRules
@@ -42,6 +43,7 @@ class MatchClockService : LifecycleService() {
     private var observer: Job? = null
     private var alertJob: Job? = null
     private var wakeLock: PowerManager.WakeLock? = null
+    private val commandGate = LiveCommandGate()
 
     private data class Snapshot(
         val match: GameMatch,
@@ -70,6 +72,7 @@ class MatchClockService : LifecycleService() {
             return START_NOT_STICKY
         }
         if (observer == null) observer = lifecycleScope.launch { observe() }
+        intent?.action?.let { action -> handleAction(action, intent.getLongExtra(EXTRA_MATCH_ID, 0L)) }
         return START_STICKY
     }
 
@@ -95,6 +98,35 @@ class MatchClockService : LifecycleService() {
         }
     }
 
+    /** A button in the notification, pressed with the phone locked or another app open. */
+    private fun handleAction(action: String, matchId: Long) {
+        if (matchId <= 0L) return
+        val now = SystemClock.elapsedRealtime()
+        // A double tap on a small notification button must not count twice.
+        if (!commandGate.accept("$matchId:$action", now)) return
+        val wall = System.currentTimeMillis()
+        val repository = app.repository
+        app.applicationScope.launch {
+            when (action) {
+                ACTION_OUR_GOAL -> repository.recordOurGoal(matchId, null, null, now, wall)
+                ACTION_THEIR_GOAL -> repository.recordOpponentGoal(matchId, now, wall)
+                ACTION_PAUSE -> repository.pauseMatchClock(matchId, now, wall)
+                ACTION_RESUME -> repository.resumeMatchClock(matchId, now, wall)
+            }
+        }
+        MatchAlerts.confirmTap(this)
+    }
+
+    private fun actionIntent(action: String, matchId: Long, requestCode: Int): PendingIntent {
+        val intent = Intent(this, MatchClockService::class.java).setAction(action).putExtra(EXTRA_MATCH_ID, matchId)
+        val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            PendingIntent.getForegroundService(this, requestCode, intent, flags)
+        } else {
+            PendingIntent.getService(this, requestCode, intent, flags)
+        }
+    }
+
     private fun show(snapshot: Snapshot) {
         val match = snapshot.match
         val clock = LiveClockRules.clock(
@@ -117,6 +149,14 @@ class MatchClockService : LifecycleService() {
                     .setWhen(System.currentTimeMillis() - clock.periodTimeMs)
             }
             else -> builder.setContentText("$period • paused at ${MatchClockCalculator.formatClock(clock.periodTimeMs)}")
+        }
+        // Goals and the clock can be handled from the lock screen; details are added later in the app.
+        if (match.status == MatchStatus.LIVE || match.status == MatchStatus.PAUSED) {
+            builder
+                .addAction(0, "Our goal", actionIntent(ACTION_OUR_GOAL, match.id, 21))
+                .addAction(0, "Their goal", actionIntent(ACTION_THEIR_GOAL, match.id, 22))
+            if (clock.running) builder.addAction(0, "Pause", actionIntent(ACTION_PAUSE, match.id, 23))
+            else builder.addAction(0, "Resume", actionIntent(ACTION_RESUME, match.id, 24))
         }
         notify(CLOCK_NOTIFICATION_ID, builder.build())
         schedulePeriodAlert(match, clock.matchTimeMs, clock.msUntilPeriodEnd, clock.periodTimeMs, clock.plannedPeriodMs, clock.running)
@@ -252,6 +292,11 @@ class MatchClockService : LifecycleService() {
         private const val ALERT_CHANNEL_ID = "period_end"
         private const val CLOCK_NOTIFICATION_ID = 41
         private const val ALERT_NOTIFICATION_ID = 42
+        private const val ACTION_OUR_GOAL = "be.matchreview.app.clock.OUR_GOAL"
+        private const val ACTION_THEIR_GOAL = "be.matchreview.app.clock.THEIR_GOAL"
+        private const val ACTION_PAUSE = "be.matchreview.app.clock.PAUSE"
+        private const val ACTION_RESUME = "be.matchreview.app.clock.RESUME"
+        private const val EXTRA_MATCH_ID = "matchId"
 
         /** Starts the notification clock; call while the app is on screen. */
         fun start(context: Context) {

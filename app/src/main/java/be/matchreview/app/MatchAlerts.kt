@@ -22,13 +22,22 @@ object MatchAlerts {
     }
 
     fun vibratePeriodEnd(context: Context) {
+        val vibrator = vibrator(context) ?: return
+        vibrator.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 450, 200, 450, 200, 800), -1))
+    }
+
+    /** A short tick that confirms a notification button press without looking. */
+    fun confirmTap(context: Context) {
+        vibrator(context)?.vibrate(VibrationEffect.createOneShot(60, VibrationEffect.DEFAULT_AMPLITUDE))
+    }
+
+    private fun vibrator(context: Context): Vibrator? {
         val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             context.getSystemService(VibratorManager::class.java)?.defaultVibrator
         } else {
             @Suppress("DEPRECATION")
             context.getSystemService(Vibrator::class.java)
         }
-        if (vibrator?.hasVibrator() != true) return
-        vibrator.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 450, 200, 450, 200, 800), -1))
+        return vibrator?.takeIf { it.hasVibrator() }
     }
 }
