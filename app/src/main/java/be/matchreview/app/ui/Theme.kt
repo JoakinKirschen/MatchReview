@@ -4,6 +4,8 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
@@ -123,6 +125,12 @@ private val AppShapes = Shapes(
     extraLarge = RoundedCornerShape(28.dp)
 )
 
+/**
+ * True in the Outdoor theme: match-day screens then use bigger buttons and text, easier to
+ * read and hit in bright sun, with gloves or in a hurry.
+ */
+val LocalLargeControls = staticCompositionLocalOf { false }
+
 @Composable
 fun MatchReviewTheme(mode: ThemeMode = ThemeMode.SYSTEM, content: @Composable () -> Unit) {
     val colors = when (mode) {
@@ -131,10 +139,12 @@ fun MatchReviewTheme(mode: ThemeMode = ThemeMode.SYSTEM, content: @Composable ()
         ThemeMode.DARK -> DarkColors
         ThemeMode.OUTDOOR -> OutdoorColors
     }
-    MaterialTheme(
-        colorScheme = colors,
-        typography = Typography(),
-        shapes = AppShapes,
-        content = content
-    )
+    CompositionLocalProvider(LocalLargeControls provides (mode == ThemeMode.OUTDOOR)) {
+        MaterialTheme(
+            colorScheme = colors,
+            typography = Typography(),
+            shapes = AppShapes,
+            content = content
+        )
+    }
 }

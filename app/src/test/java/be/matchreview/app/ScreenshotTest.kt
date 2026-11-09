@@ -104,11 +104,11 @@ open class ScreenshotTest {
         Ids(teamId, finishedId, liveId, upcomingId)
     }
 
-    private fun show(route: String?) {
+    private fun show(route: String?, theme: ThemeMode = ThemeMode.LIGHT) {
         compose.mainClock.autoAdvance = false
         compose.setContent {
             val vm = remember { MainViewModel(app) }
-            MatchReviewTheme(ThemeMode.LIGHT) { MatchReviewApp(vm, initialRoute = route) }
+            MatchReviewTheme(theme) { MatchReviewApp(vm, initialRoute = route) }
         }
         settle()
     }
@@ -175,10 +175,19 @@ open class ScreenshotTest {
     @Test fun liveMatch() { val ids = fixture(); show("live/${ids.liveId}"); capture("09-live-match") }
 
     @Test
+    fun liveMatchOutdoor() {
+        val ids = fixture()
+        show("live/${ids.liveId}", ThemeMode.OUTDOOR)
+        capture("09b-live-match-outdoor")
+    }
+
+    @Test
     fun liveCamera() {
         val ids = fixture()
         show("live/${ids.liveId}")
-        click(app.getString(R.string.camera_tab))
+        // Tablets show the camera beside the pitch, without a camera tab.
+        val cameraTab = app.getString(R.string.camera_tab)
+        if (compose.onAllNodesWithText(cameraTab).fetchSemanticsNodes().isNotEmpty()) click(cameraTab)
         capture("10-live-camera")
     }
 
@@ -219,4 +228,12 @@ open class ScreenshotTest {
 @Config(qualifiers = "w760dp-h360dp-land-hdpi")
 class LandscapeScreenshotTest : ScreenshotTest() {
     override val namePrefix = "land-"
+}
+
+/** A 10-inch tablet held sideways, where the camera sits beside the pitch. */
+@RunWith(AndroidJUnit4::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(qualifiers = "w1280dp-h800dp-land-mdpi")
+class TabletScreenshotTest : ScreenshotTest() {
+    override val namePrefix = "tablet-"
 }

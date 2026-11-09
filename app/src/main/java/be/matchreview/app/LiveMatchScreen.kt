@@ -7,6 +7,7 @@ import be.matchreview.app.ui.AppButtons
 import be.matchreview.app.ui.AppButton
 import be.matchreview.app.ui.AppOutlinedButton
 import be.matchreview.app.ui.AppTonalButton
+import be.matchreview.app.ui.LocalLargeControls
 import be.matchreview.app.ui.isLandscape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -37,6 +38,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
@@ -388,6 +390,10 @@ fun LiveMatchScreen(
     LaunchedEffect(liveActionsEnabled) { if (!liveActionsEnabled && substitutionMode) leaveSubstitutionMode() }
 
     val landscape = isLandscape()
+    val configuration = LocalConfiguration.current
+    // A tablet has room for the camera next to the pitch.
+    val cameraBesidePitch = if (landscape) configuration.screenWidthDp >= 1000
+    else configuration.screenWidthDp >= 700 && configuration.screenHeightDp >= 1000
 
     val liveHeader: @Composable () -> Unit = {
         Row(
@@ -435,8 +441,9 @@ fun LiveMatchScreen(
 
     val liveTabs: @Composable () -> Unit = {
         CompactLiveTabs(
-            selected = tab,
-            onSelected = { tab = it }
+            selected = if (cameraBesidePitch && tab == LiveTab.CAMERA) LiveTab.MATCH else tab,
+            onSelected = { tab = it },
+            tabs = if (cameraBesidePitch) listOf(LiveTab.MATCH, LiveTab.TIMELINE) else LiveTab.entries
         )
     }
 
@@ -521,33 +528,39 @@ fun LiveMatchScreen(
     }
 
     // The quick actions; in landscape they wrap onto two rows in the narrower side panel.
+    // The Outdoor theme makes them taller with bigger text.
+    val largeControls = LocalLargeControls.current
+    val actionHeight = if (largeControls) 68.dp else AppButtons.LargeHeight
+    val actionTextStyle = if (largeControls) MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+    else LocalTextStyle.current
     val ourGoalButton: @Composable (Modifier) -> Unit = { modifier ->
         AppButton(
             onClick = ::recordQuickGoal,
             enabled = !liveActionLocked,
             contentPadding = PaddingValues(horizontal = 6.dp),
-            modifier = modifier.heightIn(min = AppButtons.LargeHeight)
-        ) { Text(stringResource(R.string.our_goal), maxLines = 1, overflow = TextOverflow.Ellipsis) }
+            modifier = modifier.heightIn(min = actionHeight)
+        ) { Text(stringResource(R.string.our_goal), style = actionTextStyle, maxLines = 1, overflow = TextOverflow.Ellipsis) }
     }
     val theirGoalButton: @Composable (Modifier) -> Unit = { modifier ->
         AppOutlinedButton(
             onClick = { showOpponentGoalConfirmation = true },
             enabled = !liveActionLocked,
             contentPadding = PaddingValues(horizontal = 6.dp),
-            modifier = modifier.heightIn(min = AppButtons.LargeHeight)
-        ) { Text(stringResource(R.string.their_goal), maxLines = 1, overflow = TextOverflow.Ellipsis) }
+            modifier = modifier.heightIn(min = actionHeight)
+        ) { Text(stringResource(R.string.their_goal), style = actionTextStyle, maxLines = 1, overflow = TextOverflow.Ellipsis) }
     }
     val saveButton: @Composable (Modifier) -> Unit = { modifier ->
         AppTonalButton(
             onClick = ::startSave,
             enabled = !liveActionLocked,
             contentPadding = PaddingValues(horizontal = 6.dp),
-            modifier = modifier.heightIn(min = AppButtons.LargeHeight)
+            modifier = modifier.heightIn(min = actionHeight)
         ) {
             val saves = events.count { it.type == "KEEPER_SAVE" }
             Text(
                 if (saves > 0) "${stringResource(R.string.keeper_save)} $saves"
                 else stringResource(R.string.keeper_save),
+                style = actionTextStyle,
                 maxLines = 1
             )
         }
@@ -561,15 +574,15 @@ fun LiveMatchScreen(
             enabled = !liveActionLocked &&
                 events.any { it.type == "OUR_GOAL" || it.type == "OPPONENT_GOAL" },
             contentPadding = PaddingValues(horizontal = 6.dp),
-            modifier = modifier.heightIn(min = AppButtons.LargeHeight)
-        ) { Text(stringResource(R.string.undo)) }
+            modifier = modifier.heightIn(min = actionHeight)
+        ) { Text(stringResource(R.string.undo), style = actionTextStyle) }
     }
     val moreActionsButton: @Composable (Modifier) -> Unit = { modifier ->
         AppOutlinedButton(
             onClick = { actionsSheetOpen = true },
             enabled = !liveActionLocked,
             contentPadding = PaddingValues(horizontal = 4.dp),
-            modifier = modifier.widthIn(min = 48.dp).heightIn(min = AppButtons.LargeHeight)
+            modifier = modifier.widthIn(min = 48.dp).heightIn(min = actionHeight)
                 .semantics { contentDescription = "Shots, corners and cards" }
         ) { Text("⋯", fontWeight = FontWeight.Black) }
     }
@@ -628,50 +641,74 @@ fun LiveMatchScreen(
             playersById = playersById,
             minutesFor = { playedMs(it) },
             onPlayerClick = { selectedPlayerId = it },
-            horizontal = landscape,
+            modifier = modifier
+        )
+    }
+
+    val matchContent: @Composable ColumnScope.() -> Unit = {
+        if (landscape) {
+            substitutesHeader()
+            // The pitch lies on its side, the substitutes in a column beside it.
+            Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                livePitch(Modifier.weight(1f).fillMaxHeight())
+                LazyColumn(
+                    modifier = Modifier.width(80.dp).fillMaxHeight(),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    items(sortedBench, key = { it.playerId }) { placement ->
+                        benchCard(placement, Modifier.fillMaxWidth().height(64.dp))
+                    }
+                }
+            }
+        } else {
+            livePitch(Modifier.weight(1f).fillMaxWidth())
+            substitutesHeader()
+            LazyRow(
+                modifier = Modifier.fillMaxWidth().height(64.dp),
+                contentPadding = PaddingValues(horizontal = 2.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally)
+            ) {
+                items(sortedBench, key = { it.playerId }) { placement ->
+                    benchCard(placement, Modifier.width(78.dp).fillMaxHeight())
+                }
+            }
+        }
+    }
+    val cameraPanel: @Composable (Modifier) -> Unit = { modifier ->
+        CameraMatchPanel(
+            matchId = matchId,
+            matchClockMs = matchTimeMs,
+            recordings = recordings,
+            stopMode = recordingStopMode,
+            onStopModeChange = vm::setRecordingStopMode,
+            onWatchVideo = { showFullVideo = true },
+            onMarkMoment = { recordAction(MatchActions.MARK, null) },
             modifier = modifier
         )
     }
 
     val tabContent: @Composable ColumnScope.() -> Unit = {
         when (tab) {
-            LiveTab.MATCH -> if (landscape) {
-                substitutesHeader()
-                // The pitch lies on its side, the substitutes in a column beside it.
-                Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    livePitch(Modifier.weight(1f).fillMaxHeight())
-                    LazyColumn(
-                        modifier = Modifier.width(80.dp).fillMaxHeight(),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        items(sortedBench, key = { it.playerId }) { placement ->
-                            benchCard(placement, Modifier.fillMaxWidth().height(64.dp))
-                        }
-                    }
-                }
-            } else {
-                livePitch(Modifier.weight(1f).fillMaxWidth())
-                substitutesHeader()
-                LazyRow(
-                    modifier = Modifier.fillMaxWidth().height(64.dp),
-                    contentPadding = PaddingValues(horizontal = 2.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally)
+            LiveTab.MATCH, LiveTab.CAMERA -> when {
+                // Tablets show the camera beside or above the pitch, no tab switching needed.
+                cameraBesidePitch && landscape -> Row(
+                    Modifier.weight(1f).fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(sortedBench, key = { it.playerId }) { placement ->
-                        benchCard(placement, Modifier.width(78.dp).fillMaxHeight())
+                    Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        matchContent()
+                    }
+                    cameraPanel(Modifier.weight(1f).fillMaxHeight())
+                }
+                cameraBesidePitch -> {
+                    cameraPanel(Modifier.weight(0.45f).fillMaxWidth())
+                    Column(Modifier.weight(0.55f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        matchContent()
                     }
                 }
+                tab == LiveTab.CAMERA -> cameraPanel(Modifier.weight(1f).fillMaxWidth())
+                else -> matchContent()
             }
-            LiveTab.CAMERA -> CameraMatchPanel(
-                matchId = matchId,
-                matchClockMs = matchTimeMs,
-                recordings = recordings,
-                stopMode = recordingStopMode,
-                onStopModeChange = vm::setRecordingStopMode,
-                onWatchVideo = { showFullVideo = true },
-                onMarkMoment = { recordAction(MatchActions.MARK, null) },
-                modifier = Modifier.weight(1f).fillMaxWidth()
-            )
             LiveTab.TIMELINE -> MatchTimeline(
                 // Tags on an imported video use video positions, not match time.
                 events = events.filterNot(be.matchreview.app.domain.VideoEventRules::isImportedVideoTag).sortedWith(
@@ -812,7 +849,18 @@ fun LiveMatchScreen(
         ) {
             statusSection()
 
-            if (liveActionsEnabled) {
+            if (liveActionsEnabled && largeControls) {
+                // The big outdoor buttons need two rows to keep their labels readable.
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    ourGoalButton(Modifier.weight(1f))
+                    theirGoalButton(Modifier.weight(1f))
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    saveButton(Modifier.weight(1f))
+                    undoButton(Modifier)
+                    moreActionsButton(Modifier)
+                }
+            } else if (liveActionsEnabled) {
                 Row(
                     Modifier.fillMaxWidth().heightIn(min = 56.dp),
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -1737,7 +1785,8 @@ private fun LiveScoreboard(
                 Text(
                     MatchClockCalculator.formatClock(matchTimeMs),
                     color = Color.White,
-                    style = MaterialTheme.typography.headlineMedium,
+                    style = if (LocalLargeControls.current) MaterialTheme.typography.displaySmall
+                    else MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Black
                 )
                 val overtime = PeriodTimeRules.overtimeMs(periodTimeMs, plannedPeriodMs)
@@ -1782,13 +1831,13 @@ private fun LivePitch(
     playersById: Map<Long, Player>,
     minutesFor: (Long) -> Long,
     onPlayerClick: (Long) -> Unit,
-    /** The pitch on its side, our goal on the left, for landscape screens. */
-    horizontal: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     BoxWithConstraints(
         modifier.clip(RoundedCornerShape(16.dp)).background(PitchColors.grass)
     ) {
+        // A wide space gets the pitch on its side, our goal on the left.
+        val horizontal = maxWidth > maxHeight
         PitchLines(Modifier.fillMaxSize(), horizontal = horizontal)
         placements.forEach { placement ->
             val player = playersById[placement.playerId] ?: return@forEach
@@ -1887,17 +1936,20 @@ private fun BenchMinuteCard(
 @Composable
 private fun CompactLiveTabs(
     selected: LiveTab,
-    onSelected: (LiveTab) -> Unit
+    onSelected: (LiveTab) -> Unit,
+    tabs: List<LiveTab> = LiveTab.entries
 ) {
     TabRow(
-        selectedTabIndex = selected.ordinal,
+        selectedTabIndex = tabs.indexOf(selected).coerceAtLeast(0),
         modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)
     ) {
-        listOf(
-            LiveTab.MATCH to stringResource(R.string.match_tab),
-            LiveTab.CAMERA to stringResource(R.string.camera_tab),
-            LiveTab.TIMELINE to stringResource(R.string.timeline_tab)
-        ).forEach { (tab, label) ->
+        tabs.map { tab ->
+            tab to when (tab) {
+                LiveTab.MATCH -> stringResource(R.string.match_tab)
+                LiveTab.CAMERA -> stringResource(R.string.camera_tab)
+                LiveTab.TIMELINE -> stringResource(R.string.timeline_tab)
+            }
+        }.forEach { (tab, label) ->
             Tab(
                 selected = selected == tab,
                 onClick = { onSelected(tab) },
@@ -1919,6 +1971,7 @@ private fun LiveControlBar(
     onNextPeriod: () -> Unit,
     onFinish: () -> Unit
 ) {
+    val buttonHeight = if (LocalLargeControls.current) 60.dp else 48.dp
     Row(
         Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = 8.dp, vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -1929,30 +1982,30 @@ private fun LiveControlBar(
                 AppButton(
                     onClick = onKickOff,
                     enabled = actionEnabled,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                    modifier = Modifier.fillMaxWidth().heightIn(min = buttonHeight)
                 ) { Text("Kick off • Start period 1") }
             MatchStatus.LIVE -> {
                 AppButton(
                     onClick = onPause,
                     enabled = actionEnabled,
-                    modifier = Modifier.weight(1f).heightIn(min = 48.dp)
+                    modifier = Modifier.weight(1f).heightIn(min = buttonHeight)
                 ) { Text("Pause match") }
                 AppOutlinedButton(
                     onClick = onEndPeriod,
                     enabled = actionEnabled,
-                    modifier = Modifier.weight(1f).heightIn(min = 48.dp)
+                    modifier = Modifier.weight(1f).heightIn(min = buttonHeight)
                 ) { Text("End period") }
             }
             MatchStatus.PAUSED -> {
                 AppButton(
                     onClick = onResume,
                     enabled = actionEnabled,
-                    modifier = Modifier.weight(1f).heightIn(min = 48.dp)
+                    modifier = Modifier.weight(1f).heightIn(min = buttonHeight)
                 ) { Text("Resume match") }
                 AppOutlinedButton(
                     onClick = onEndPeriod,
                     enabled = actionEnabled,
-                    modifier = Modifier.weight(1f).heightIn(min = 48.dp)
+                    modifier = Modifier.weight(1f).heightIn(min = buttonHeight)
                 ) { Text("End period") }
             }
             MatchStatus.PERIOD_ENDED -> {
@@ -1960,18 +2013,18 @@ private fun LiveControlBar(
                     AppButton(
                         onClick = onNextPeriod,
                         enabled = actionEnabled,
-                        modifier = Modifier.weight(1f).heightIn(min = 48.dp)
+                        modifier = Modifier.weight(1f).heightIn(min = buttonHeight)
                     ) { Text("Start period ${match.currentPeriod + 1}") }
                     AppOutlinedButton(
                         onClick = onFinish,
                         enabled = actionEnabled,
-                        modifier = Modifier.heightIn(min = 48.dp)
+                        modifier = Modifier.heightIn(min = buttonHeight)
                     ) { Text("Finish match") }
                 } else {
                     AppButton(
                         onClick = onFinish,
                         enabled = actionEnabled,
-                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                        modifier = Modifier.fillMaxWidth().heightIn(min = buttonHeight)
                     ) { Text("Finish match") }
                 }
             }
