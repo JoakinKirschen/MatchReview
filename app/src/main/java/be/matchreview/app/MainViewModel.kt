@@ -27,7 +27,7 @@ import be.matchreview.app.domain.RecordingStopMode
 import be.matchreview.app.recording.MatchRecordingService
 import be.matchreview.app.ui.ThemeMode
 import be.matchreview.app.i18n.AppLanguage
-import be.matchreview.app.i18n.I18n
+import be.matchreview.app.i18n.LanguageSettings
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
@@ -107,15 +107,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _themeMode.value = mode
     }
 
-    private val _language = MutableStateFlow(AppLanguage.fromName(displayPreferences.getString("language", null)))
-    val language: StateFlow<AppLanguage> = _language.asStateFlow()
+    val language: StateFlow<AppLanguage> = LanguageSettings.selected
 
     /** Switches the app's language right away; screens follow without restarting. */
-    fun setLanguage(language: AppLanguage) {
-        displayPreferences.edit().putString("language", language.name).apply()
-        _language.value = language
-        I18n.apply(language)
-    }
+    fun setLanguage(language: AppLanguage) = LanguageSettings.choose(getApplication(), language)
 
     private val draftPreferences =
         application.getSharedPreferences("matchreview_live_drafts", 0)

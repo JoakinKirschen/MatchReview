@@ -7,8 +7,7 @@ import be.matchreview.app.backup.AutoBackupController
 import be.matchreview.app.backup.MatchBackupManager
 import be.matchreview.app.data.AppDatabase
 import be.matchreview.app.data.MatchRepository
-import be.matchreview.app.i18n.AppLanguage
-import be.matchreview.app.i18n.I18n
+import be.matchreview.app.i18n.LanguageSettings
 import be.matchreview.app.recording.PeriodRecordingController
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -27,7 +26,7 @@ class MatchReviewApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         // Before any screen, notification or export is made, so they use the chosen language.
-        I18n.apply(AppLanguage.fromName(getSharedPreferences("matchreview_display", 0).getString("language", null)))
+        LanguageSettings.refresh(this)
         applicationScope.launch {
             repository.markOpenRecordingsInterrupted(
                 tr("Recording was interrupted because the app or device stopped unexpectedly")

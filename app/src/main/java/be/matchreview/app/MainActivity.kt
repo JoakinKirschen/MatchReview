@@ -1,5 +1,6 @@
 package be.matchreview.app
 
+import be.matchreview.app.i18n.LanguageSettings
 import be.matchreview.app.i18n.tr
 
 import be.matchreview.app.ui.isLandscape
@@ -35,6 +36,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // The language may have been changed in the phone's settings while the app was open.
+        LanguageSettings.refresh(this)
         if (savedInstanceState == null) handleIntent(intent)
         setContent {
             val vm: MainViewModel = viewModel()
