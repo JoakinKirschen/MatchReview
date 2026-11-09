@@ -1,7 +1,7 @@
 # MatchReview Pass Changelog
 
 This is the **single source of truth** for implementation-pass notes and change tracking.
-It consolidates implementation notes for Passes 1–67.
+It consolidates implementation notes for Passes 1–68.
 
 ## How to maintain this file
 
@@ -37,7 +37,7 @@ For every future development pass:
 
 | Pass | Status | Planned change | Version impact |
 |---:|---|---|---|
-| 68 | Not scheduled | Add the next approved recommendation here | To be determined |
+| 69 | Not scheduled | Add the next approved recommendation here | To be determined |
 
 ## Documentation changes
 
@@ -1538,4 +1538,18 @@ begin.
 
 ### Deferred or known limitations
 - The translations were written without native-speaker review. Turkish sentences avoid putting case endings on names, which reads slightly formal.
+
+## Pass 68 — Per-app language, release signing, release checklist
+
+**Status:** Completed  
+**Completed:** 2026-11-09  
+**Version impact:** None (still 1.6.0)
+
+### Added or changed
+- `res/xml/locales_config.xml` and `android:localeConfig`: Android 13+ lists the seven languages under Settings > Apps > MatchReview > Language. `LanguageSettings` keeps that setting and the in-app menu as one choice.
+- Release signing: `app/build.gradle.kts` signs release builds with a key from `keystore.properties` (ignored by Git) or `MATCHREVIEW_*` environment variables; without one the release APK stays unsigned. GitHub Actions builds and uploads a signed `android-release-apk` when the key is stored as secrets. `RELEASE_SIGNING.md` explains it.
+- `RELEASE_CHECKLIST.md`: device checks for passes 65–67 and release signing.
+
+### Tests and verification
+- `LanguageSettingsTest` (Robolectric, API 34) checks both directions of the language sync. A release build was signed with a throwaway key and verified with `apksigner`; without a key it builds unsigned.
 

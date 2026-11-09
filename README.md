@@ -6,7 +6,7 @@ review it afterwards. Everything stays on the phone; nothing is sent to a server
 
 Current version: **1.6.0** (`versionCode 8`). Android 8.0 (API 26) or newer.
 Languages: English, Dutch, French, German, Spanish, Italian and Turkish, chosen on the home
-screen or following the phone's language.
+screen, in Android 13+'s per-app language setting, or following the phone's language.
 
 ## What it does
 
@@ -60,6 +60,7 @@ Android Studio with JDK 17 and Android SDK 35, or the command line:
 
 The APK is `app/build/outputs/apk/debug/app-debug.apk`. Debug builds are signed with the
 committed `app/debug.keystore`, so a new APK installs over the previous one and keeps the data.
+Store releases are signed with your own private key: see [`RELEASE_SIGNING.md`](RELEASE_SIGNING.md).
 
 The unit tests run on the JVM with Robolectric (no emulator). Screenshots of the main
 screens, upright, sideways, on a tablet and in Dutch, are rendered into
@@ -70,7 +71,8 @@ SCREENSHOTS=1 ./gradlew testDebugUnitTest --tests '*ScreenshotTest*'
 ```
 
 GitHub Actions (`.github/workflows/main.yml`) builds every pushed branch and pull request,
-runs the tests and uploads the debug APK as the `matchreview-debug-apk` artifact.
+runs the tests and uploads the debug APK as the `android-debug-apk` artifact. With the release
+key stored as repository secrets it also uploads a signed `android-release-apk`.
 
 Toolchain: Android Gradle Plugin 8.6.1, Gradle 8.9 (wrapper), Kotlin 1.9.24, Java 17,
 compile/target SDK 35, Jetpack Compose, Room, CameraX and Media3.
@@ -90,4 +92,5 @@ language, its placeholders differ, or a sentence was left in English.
 - [`PASS_CHANGELOG.md`](PASS_CHANGELOG.md): every change, pass by pass (the single source of truth).
 - [`VERSIONING.md`](VERSIONING.md): app, database and backup-format versions.
 - [`RELEASE_CHECKLIST.md`](RELEASE_CHECKLIST.md): checks on a real device before a release.
+- [`RELEASE_SIGNING.md`](RELEASE_SIGNING.md): creating and using the private release key.
 - [`ICON_SUGGESTIONS.md`](ICON_SUGGESTIONS.md): launcher icon concepts.

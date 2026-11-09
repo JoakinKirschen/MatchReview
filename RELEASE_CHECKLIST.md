@@ -94,3 +94,45 @@
 - [ ] Create a practice match and verify its eight-player squad and 2-4-1 setup
 - [ ] Confirm the dashboard season summary excludes draft and active matches
 
+
+## Landscape, video and languages (passes 65–67)
+
+### Landscape and tablets
+- [ ] Turn the phone during a live match on every tab: the camera preview, open sheets and the chosen tab stay
+- [ ] Turn the phone while recording: the recording continues; the next clip uses the new orientation
+- [ ] Landscape: lineup, substitution mode and live pitch lie sideways; drag-and-drop lands where the finger is
+- [ ] Tablet (10"): camera beside the pitch in landscape, above it upright; no camera tab
+- [ ] Outdoor theme: bigger buttons and clock; labels readable in sunlight
+
+### Recording
+- [ ] Android 8 or 9: the storage permission is asked with the camera and the clip appears in Movies/MatchReview
+- [ ] Stop filming "at period end": ending a period saves the clip; starting the next period records again with the same sound and camera
+- [ ] Stop filming "when time is up": the clip stops at the planned time with the screen off, and restarts with the next period
+- [ ] Start the next period while the previous clip is still saving: recording still restarts
+- [ ] Start recording yourself during the break: it is not interrupted when the period starts
+- [ ] Mark button while filming: the moment appears in the timeline and the full match video, not in the PDF
+
+### Notification
+- [ ] Lock the phone during a period: Our goal, Their goal and Pause/Resume work from the lock screen with a short vibration
+- [ ] A double tap counts once; notification goals show "scorer not assigned" in the app
+
+### Video review
+- [ ] Watch full match: clips play back to back, the match clock is right, period and event jumps land a few seconds early
+- [ ] Slow motion ¼× and ½×, frame steps back and forward, pinch zoom and drag, tap the zoom label to reset
+- [ ] Save the full match as one video, a player reel and a marked-moments reel; play and share each
+
+### Backups
+- [ ] Automatic backup with videos shows the size warning
+- [ ] Share latest backup sends the newest automatic backup to Drive or e-mail and it restores
+
+### Languages
+- [ ] Switch through all seven languages on the home screen; screens, notifications and a PDF change immediately
+- [ ] Android 13+: Settings > Apps > MatchReview > Language lists the seven languages and matches the in-app menu both ways
+- [ ] Phone in an unsupported language with "System": the app shows English
+- [ ] Have a native speaker read the live screen, camera tab and review screen in each language you ship
+
+## Release signing
+
+- [ ] Build with your own release key (`RELEASE_SIGNING.md`), never with `app/debug.keystore`
+- [ ] `apksigner verify --print-certs app/build/outputs/apk/release/app-release.apk` shows your certificate
+- [ ] Key and passwords are stored in two safe places
