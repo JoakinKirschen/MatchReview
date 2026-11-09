@@ -1,218 +1,90 @@
-# MatchReview Android
+# MatchReview
 
-## 1.5.0 match-day release
+An offline Android app for youth football coaches: pick the squad, set the lineup, run
+the match from the sideline (clock, goals, substitutions, playing time), film it, and
+review it afterwards. Everything stays on the phone; nothing is sent to a server.
 
-Passes 46–51 add drag-and-drop substitution mode, lineup pictures in the timeline,
-goalkeeper saves, goal positions with a goal map, team logos on the PDF summary, and
-editable match details.
+Current version: **1.6.0** (`versionCode 8`). Android 8.0 (API 26) or newer.
+Languages: English and Dutch (Nederlands), chosen on the home screen or following the phone.
 
-## 1.4.0 trust-and-resilience release
+## What it does
 
-Passes 36–45 strengthen match-data integrity, duplicate-action protection, clock recovery,
-recording diagnostics, backup verification, privacy-safe CSV export, accessibility,
-storage budgeting, practice-mode onboarding, and season summaries.
+**Before the match**
+- Teams and players, with logos, shirt numbers and preferred positions.
+- Match setup for 3v3, 5v5, 8v8 and 11v11 with legal formations, periods and rolling
+  substitutions; the previous match's settings are reused.
+- Squad selection with availability (injured, suspended, unavailable).
+- Starting lineup by long-press drag and drop on a pitch; a match-day readiness check.
 
-See [`PASS_CHANGELOG.md`](PASS_CHANGELOG.md) for the consolidated implementation
-history for Passes 1–64. All future pass changes must also be recorded there.
+**During the match**
+- A match clock that survives app restarts and phone reboots, shown in the notification
+  with an alert when the planned period time is up. The notification has *Our goal*,
+  *Their goal* and *Pause/Resume* buttons, also on the lock screen.
+- Goals (scorer, assist, place in the goal), keeper saves, shots, corners and cards.
+- Substitution mode: drag substitutes onto the pitch, confirm the whole round at once.
+  Playing minutes per player, with the players who played least highlighted.
+- Camera: films the match from the camera tab while the rest of the app keeps working.
+  Filming can stop by itself at the end of each period (or when the planned time is up)
+  and start again with the next period. A bookmark button marks moments to find later.
+- Works upright and held sideways; on tablets the camera sits beside the pitch. The
+  *Outdoor* theme gives bigger buttons and stronger contrast in sunlight.
 
+**After the match**
+- Timeline, statistics, goal map and lineup pictures; notes and a team rating.
+- *Watch full match*: all clips back to back with the match clock, jumps to periods and
+  events, slow motion, frame-by-frame stepping and pinch-to-zoom.
+- Highlight videos (our goals, all goals, marked moments, one player) and the full match
+  as one video file, saved without re-encoding.
+- PDF match summary, season report, privacy-safe CSV export.
+- Encrypted backups (manual or automatic after every match) and restore.
 
-A native Android application for offline football match review, team/player management,
-video playback, event tagging, and match notes.
+## Where files are saved
 
-## Build with GitHub Actions
+- Match video: the phone's **Movies/MatchReview** folder (visible in the gallery), named
+  `MatchReview_<date>_<time>.mp4`; highlight videos go to the same folder.
+- Backups: wherever you choose (`.mrbak`, password-encrypted). Automatic backups keep
+  the newest five in the chosen folder; *Share latest backup* sends one to Drive or e-mail.
 
-1. Create a new GitHub repository.
-2. Unzip this package.
-3. Open the extracted project folder and upload **its contents**—including the hidden
-   `.github` folder—to the repository root. Do not add an extra enclosing folder.
-4. Commit to the `main` branch.
-5. Open **Actions → Build Android APK → Run workflow**.
-6. When the build finishes, download the `matchreview-debug-apk` artifact.
+## Build
 
-Debug APKs are signed with the fixed key in `app/debug.keystore`, so a newer APK installs
-over the previous one and keeps your data. APKs built before this change used a random
-key; uninstall that version once (create a backup first), then updates install normally.
-
-The workflow installs Java 17 and Android API 35/build-tools 35.0.0, and builds with the
-Gradle wrapper (Gradle 8.9). It runs the unit tests and fails if any test fails. It always
-uploads the `gradle-logs` and `android-test-reports` artifacts, even if compilation fails.
-
-
-
-### Troubleshooting: “Plugin com.android.application was not found”
-
-This package declares the Android and Kotlin plugin versions in both the root
-`build.gradle.kts` and the `pluginManagement.plugins` block in `settings.gradle.kts`.
-If GitHub Actions still reports that the Android plugin has no version, check that:
-
-1. `settings.gradle.kts`, `build.gradle.kts`, `gradlew`, and the `app` folder are all at
-   the repository root;
-2. the repository does not contain an older root `build.gradle.kts` that starts with a
-   versionless `id("com.android.application")`; and
-3. the workflow is building the same directory whose `settings.gradle.kts` you uploaded.
-
-The workflow prints the selected Gradle project path before validation.
-
-## Important project files
-
-- `build.gradle.kts`: declares Android/Kotlin plugin versions.
-- `settings.gradle.kts`: declares plugin versions plus plugin and dependency repositories.
-  Plugin versions are intentionally present here as a fallback for versionless module
-  declarations.
-- `app/build.gradle.kts`: Android app and dependency configuration.
-- `.github/workflows/blank.yml`: APK build workflow.
-- `PASS_CHANGELOG.md`: single source of truth for all implementation-pass changes.
-- `VERSIONING.md`: Git, Android, Room, and backup-format version policy.
-- `STATIC_VALIDATION_1_4_0.md`: checks completed for Passes 36–45.
-
-## Toolchain
-
-- Android Gradle Plugin 8.6.1
-- Gradle 8.9 (via the committed Gradle wrapper)
-- Kotlin 1.9.24
-- Java 17
-- compileSdk / targetSdk 35
-- Compose compiler 1.5.14
-
-## Local build
-
-If Android SDK 35 is installed:
+Android Studio with JDK 17 and Android SDK 35, or the command line:
 
 ```bash
 ./gradlew assembleDebug
+```
+
+```bash
 ./gradlew testDebugUnitTest
 ```
 
-The unit tests include Robolectric tests for the Room DAO, the full 1→4 database
-upgrade, and long-press drag-and-drop on the lineup builder. They run on the JVM; no
-emulator is needed.
+The APK is `app/build/outputs/apk/debug/app-debug.apk`. Debug builds are signed with the
+committed `app/debug.keystore`, so a new APK installs over the previous one and keeps the data.
 
-The APK is created at:
+The unit tests run on the JVM with Robolectric (no emulator). Screenshots of the main
+screens, upright, sideways, on a tablet and in Dutch, are rendered into
+`app/build/screenshots` with:
 
-```text
-app/build/outputs/apk/debug/app-debug.apk
+```bash
+SCREENSHOTS=1 ./gradlew testDebugUnitTest --tests '*ScreenshotTest*'
 ```
 
+GitHub Actions (`.github/workflows/main.yml`) builds every pushed branch and pull request,
+runs the tests and uploads the debug APK as the `matchreview-debug-apk` artifact.
 
-## Current implementation status
+Toolchain: Android Gradle Plugin 8.6.1, Gradle 8.9 (wrapper), Kotlin 1.9.24, Java 17,
+compile/target SDK 35, Jetpack Compose, Room, CameraX and Media3.
 
-This package contains the original 15 implementation passes plus 30 usability and reliability passes
-(16–45). It includes release hardening, exports, storage safeguards, accessibility
-improvements, privacy-safe deletion, team/player editing, legal match-size formations,
-improved match-day workflows, PDF summaries, and encrypted backup/restore.
+## Translations
 
-See [`PASS_PLAN.md`](PASS_PLAN.md) for the original phased plan and the post-plan
-enhancements, including the backup pass. Existing version-1 databases are upgraded with explicit Room migrations;
-destructive migration is not enabled.
+Texts are written in English as `tr("…")`; the Dutch versions are in
+`app/src/main/java/be/matchreview/app/i18n/Dutch.kt`. Values use named placeholders
+(`tr("Period {number}", "number" to 2)`), and a word with two meanings carries a note after
+a bar (`tr("Home|navigation")`). `TranslationCoverageTest` fails when a text has no Dutch
+entry or its placeholders differ.
 
+## Project documents
 
-## Pass 2 workflow
-
-1. Create a team and add players.
-2. Create a match.
-3. The app opens **Select match-day squad**.
-4. Mark players available, injured, suspended or unavailable.
-5. Select the players who are in the squad.
-6. Save the squad. Pitch placement follows in Pass 3.
-
-
-## Pass 3
-The match setup now continues from squad selection to a responsive pitch lineup builder with automatic formation placement, a substitutes bench and persisted player positions. See [`PASS_CHANGELOG.md`](PASS_CHANGELOG.md).
-
-
-## Pass 4
-Long-press any selected player and drag them between the substitutes bench and pitch. Pitch positions are saved after release, and nearby free formation slots snap automatically. Tap-based and accessibility-safe placement remain available. See [`PASS_CHANGELOG.md`](PASS_CHANGELOG.md).
-
-
-## Pass 5 live match workflow
-
-After saving the starting lineup, choose **Continue to match day**. Kick off the first period, pause/resume the durable clock, end periods, and start the next period. If you leave the screen, use **Resume live match** on the dashboard.
-
-
-## Pass 6
-
-Live substitutions, player removal, rolling re-entry, and accurate participation intervals are now implemented. See [`PASS_CHANGELOG.md`](PASS_CHANGELOG.md).
-
-
-## Pass 7 additions
-
-The live match screen now supports goals, assists, opponent goals, score correction,
-undo, and a persisted event timeline. The displayed score is kept consistent with
-the stored scoring events.
-
-
-## Pass 8 camera recording
-
-Open the **Camera** tab during match day, grant camera permission, choose whether audio
-should be recorded, and tap the red record control. Each recording is saved as a separate
-MediaStore video in `Movies/MatchReview` and tracked in Room. Recording can continue while
-switching to the Match or Timeline tab.
-
-
-## Pass 9 video/event workflow
-
-Events created while recording are linked to their video segment automatically. In the
-Camera tab, use the goal, substitution and opponent quick actions without leaving the preview.
-In Timeline, tap **Clip** to open the correct recording at the event timestamp and navigate
-to the previous or next recorded event.
-
-
-## Pass 10 release hardening
-
-The match review screen can export match data as CSV and permanently delete a match together
-with app-recorded clips after confirmation. Imported videos are not deleted. Camera recording
-warns below 1 GB free storage and is blocked below 250 MB. Android backup and cleartext traffic
-are disabled.
-
-See [`PASS_CHANGELOG.md`](PASS_CHANGELOG.md) for verification commands and the physical-device
-release checklist.
-
-
-## Pass 11 team, player, and match-size improvements
-
-Teams and players can be edited or removed with confirmation. Match setup provides 3v3,
-5v5, 8v8, and 11v11 presets with legal formations. The 8v8 choices include **2-4-1**.
-Lineup players continue to support long-press drag-and-drop plus tap-based and
-accessibility-safe placement. See [`PASS_CHANGELOG.md`](PASS_CHANGELOG.md).
-
-## Pass 12 layout and drag reliability
-
-The lineup editor removes the scrolling parent that previously competed with drag input.
-Players are moved by **long-pressing and then dragging** between the bench and pitch.
-Tap-based placement remains available. Both lineup and live-match pitches use the
-available screen space more efficiently. See [`PASS_CHANGELOG.md`](PASS_CHANGELOG.md).
-
-
-## New match defaults and PDF summaries
-
-When creating a match, MatchReview now reuses the previous match's competition, match
-size, formation, and period timing. Formation entry is restricted to legal choices for
-the selected match size. The review screen can also save a printable PDF match summary
-in addition to the detailed CSV export.
-
-
-
-## Pass 14 encrypted backup and restore
-
-Open **Backup & restore** from the dashboard or from a match review. MatchReview creates
-a password-encrypted `.mrbak` package containing versioned JSON for all teams, players,
-matches, squads, lineups, events, periods, minutes, and recording references. Android's
-document picker can save the file locally or through an installed provider such as
-Google Drive or OneDrive; MatchReview itself does not connect to a cloud account.
-
-Video files are excluded by default. They can be included explicitly, with a warning
-that the backup may be large and that club consent and retention rules still apply.
-Restore validates the encrypted package before replacing data, requires a confirmation,
-and is blocked while a match or recording is active. A wrong password or damaged package
-does not alter the existing database.
-
-The backup format records its own format version, the Room database version, the app
-version, creation time, and—since format `2`—a SHA-256 database-content digest.
-MatchReview 1.4.0 writes format `2` and can restore legacy format `1`. See
-[`PASS_CHANGELOG.md`](PASS_CHANGELOG.md) and [`VERSIONING.md`](VERSIONING.md).
-
-## Launcher icon
-
-An adaptive **Pitch Replay** launcher icon is included, with round-mask and Android 13+
-themed-icon support. Two alternative concepts are documented in
-[`ICON_SUGGESTIONS.md`](ICON_SUGGESTIONS.md).
+- [`PASS_CHANGELOG.md`](PASS_CHANGELOG.md): every change, pass by pass (the single source of truth).
+- [`VERSIONING.md`](VERSIONING.md): app, database and backup-format versions.
+- [`RELEASE_CHECKLIST.md`](RELEASE_CHECKLIST.md): checks on a real device before a release.
+- [`ICON_SUGGESTIONS.md`](ICON_SUGGESTIONS.md): launcher icon concepts.

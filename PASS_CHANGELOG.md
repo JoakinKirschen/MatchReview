@@ -1,7 +1,7 @@
 # MatchReview Pass Changelog
 
 This is the **single source of truth** for implementation-pass notes and change tracking.
-It consolidates implementation notes for Passes 1–65.
+It consolidates implementation notes for Passes 1–66.
 
 ## How to maintain this file
 
@@ -37,7 +37,7 @@ For every future development pass:
 
 | Pass | Status | Planned change | Version impact |
 |---:|---|---|---|
-| 66 | Not scheduled | Add the next approved recommendation here | To be determined |
+| 67 | Not scheduled | Add the next approved recommendation here | To be determined |
 
 ## Documentation changes
 
@@ -1495,3 +1495,29 @@ begin.
 ### Deferred or known limitations
 - The recording stops when the coach ends the period, not when the planned period time is reached, so added time is still filmed.
 - A clip keeps the orientation it started in; turning the phone mid-recording affects the next clip.
+
+## Pass 66 — General review: Android 8/9 video, video study tools, match-day comfort, Dutch
+
+**Status:** Completed  
+**Completed:** 2026-11-09  
+**Version impact:** App 1.6.0 (`versionCode 8`); database and backup format unchanged
+
+### Added or changed
+- Android 8 and 9: the storage permission needed to save video in Movies/MatchReview is declared (up to API 28), asked for with the camera, and the file path is given to CameraX.
+- Mark a moment while filming (bookmark button, also in the shots/corners/cards sheet); marks are listed in the timeline and the match video, not in the PDF.
+- Match video viewer: ¼× and ½× speed, one-frame steps, two-finger zoom and pan.
+- Highlights and video files: the full match as one file, a reel per player (goals, assists, saves, shots) and of the marked moments.
+- "Stop filming" menu: manually, when the coach ends the period, or when the planned period time is up (from the clock service, so also with the screen off); the last two restart with the next period.
+- Notification buttons: Our goal, Their goal and Pause/Resume while a period is played, with a confirming vibration and protection against double taps.
+- Outdoor theme: bigger quick-action and clock buttons and match clock. Tablets show the camera next to (or above) the pitch. The live pitch picks its orientation from its space.
+- Backups: size warning when automatic backups include video; "Share latest backup" to send it to Drive or e-mail; the folder hint no longer suggests Drive folders.
+- Dutch translation: `tr()` with named placeholders and `i18n/Dutch.kt` (779 texts), language picker (System, English, Nederlands) that switches immediately; saved data (tag types, file names, SQL) stays English.
+- Code health: `MainActivity.kt` split into one file per screen; CI builds every branch; README rewritten.
+
+### Tests and verification
+- New: `VideoViewRulesTest`, `TranslationCoverageTest`, more cases in `HighlightRulesTest`, `PeriodRecordingRulesTest` and `AutoBackupRulesTest`; outdoor, tablet and Dutch screenshot runs. All unit tests pass locally and on GitHub Actions.
+
+### Deferred or known limitations
+- Not tried on a real device: camera recording on Android 8/9, notification buttons on the lock screen, pinch zoom and frame stepping on real video, and starting the period restart while the phone is locked.
+- Dutch texts were written without a native-speaker review; terms follow common Flemish youth-football usage ("Goal voor", "Wissel", "Periode").
+

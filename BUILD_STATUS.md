@@ -2,16 +2,18 @@
 
 ## Release candidate
 
-- Version name: `1.5.0`
-- Version code: `7`
-- Includes implementation passes 1–51
-- Room database version `5` (migration 4 → 5 adds team logos, goal positions and lineup pictures)
+- Version name: `1.6.0`
+- Version code: `8`
+- Includes implementation passes 1–66
+- Room database version `6`
 - Backup format is `2` with restore support for legacy format `1`
 
 ## Workspace build result
 
-An APK could not be compiled in the assistant workspace because the environment does not
-contain Java, the Android SDK, Gradle, or a cached Gradle distribution.
+Passes 65–66 were compiled and tested in a cloud workspace with JDK 21, Android SDK 35 and
+the Gradle wrapper: all unit tests pass, including the Robolectric screenshot runs
+(upright, sideways, tablet and Dutch). GitHub Actions builds every pushed branch.
+No real device or emulator was available there; see `RELEASE_CHECKLIST.md`.
 
 ## Build locally
 
