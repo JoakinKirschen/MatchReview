@@ -40,7 +40,9 @@ class TranslationCoverageTest {
             listOf(
                 "Goal", "Shot", "Chance", "Pass", "Cross", "Corner", "Free kick", "Foul", "Save", "Turnover",
                 "Pressing", "Defensive error", "Set piece", "Custom", "Positive", "Neutral", "Improve"
-            )
+            ) +
+            listOf("top", "middle", "bottom").flatMap { height -> listOf("left", "centre", "right").map { "$height $it" } }
+                .filter { it != "middle centre" } + "centre"
 
     @Test
     fun `every text has a Dutch translation`() {

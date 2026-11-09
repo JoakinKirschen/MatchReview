@@ -1,5 +1,7 @@
 package be.matchreview.app.domain
 
+import be.matchreview.app.i18n.tr
+
 /**
  * Maps between a drawn goal mouth and stored goal positions. Stored values are
  * 0..1 from the left post to the right post and from the crossbar down to the ground.
@@ -48,6 +50,7 @@ object GoalMouthGeometry {
             goalX < 0.67f -> "centre"
             else -> "right"
         }
-        return if (height == "middle" && side == "centre") "centre" else "$height $side"
+        // Translated as a whole phrase: word order differs between languages.
+        return tr(if (height == "middle" && side == "centre") "centre" else "$height $side")
     }
 }

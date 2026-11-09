@@ -5,7 +5,7 @@ package be.matchreview.app.i18n
  * A missing entry shows the English text; TranslationCoverageTest lists any that are missing.
  */
 internal object Dutch {
-    val texts: Map<String, String> = HashMap<String, String>(1540).apply {
+    val texts: Map<String, String> = HashMap<String, String>(1558).apply {
         put(" (assist {value})", " (assist {value})")
         put(" - {time} total", " - {time} in totaal")
         put(" to Movies/MatchReview", " in Movies/MatchReview")
@@ -77,6 +77,9 @@ internal object Dutch {
         put("backup {backupFormatVersion}", "back-up {backupFormatVersion}")
         put("BENCH • {playersCount}", "BANK • {playersCount}")
         put("Binary database columns are not supported.", "Binaire databasekolommen worden niet ondersteund.")
+        put("bottom centre", "middenonder")
+        put("bottom left", "linksonder")
+        put("bottom right", "rechtsonder")
         put("Break", "Rust")
         put("Break after period {currentPeriod} • {time} played", "Rust na periode {currentPeriod} • {time} gespeeld")
         put("Camera", "Camera")
@@ -91,6 +94,7 @@ internal object Dutch {
         put("CameraX finalize error {error}", "Camerafout bij het afwerken {error}")
         put("Cancel", "Annuleren")
         put("Cancelled", "Afgelast")
+        put("centre", "midden")
         put("Chance", "Kans")
         put("Change logo", "Logo wijzigen")
         put("Change video", "Andere video")
@@ -305,6 +309,8 @@ internal object Dutch {
         put("Matches", "Wedstrijden")
         put("MatchReview backup", "MatchReview-back-up")
         put("MatchReview camera", "MatchReview-camera")
+        put("middle left", "links halfhoog")
+        put("middle right", "rechts halfhoog")
         put("Min", "Min")
         put("Minutes", "Minuten")
         put("Minutes each", "Minuten per periode")
@@ -665,6 +671,9 @@ internal object Dutch {
         put("Times are positions in the imported video, not match time.", "Tijden zijn posities in de geïmporteerde video, geen wedstrijdtijd.")
         put("Times are positions in the imported video.", "Tijden zijn posities in de geïmporteerde video.")
         put("Timing", "Speeltijd")
+        put("top centre", "middenboven")
+        put("top left", "linksboven")
+        put("top right", "rechtsboven")
         put("Totals include corrections made in the app.", "Totalen bevatten correcties gemaakt in de app.")
         put("Tracked: {matches} M • {minutes} min • ", "Gemeten: {matches} M • {minutes} min • ")
         put("Turn off", "Uitschakelen")
