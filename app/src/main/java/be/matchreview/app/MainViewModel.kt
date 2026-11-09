@@ -90,6 +90,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun runAutoBackupNow() = autoBackup.runInBackground()
 
+    /** The newest automatic backup, to send to Drive, e-mail or another app. */
+    suspend fun latestAutoBackup(): Uri? = autoBackup.latestBackup()
+
     private val displayPreferences =
         application.getSharedPreferences("matchreview_display", 0)
     private val _themeMode = MutableStateFlow(ThemeMode.fromName(displayPreferences.getString("theme", null)))

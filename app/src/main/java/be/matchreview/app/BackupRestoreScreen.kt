@@ -12,6 +12,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -43,6 +44,8 @@ internal fun BackupRestoreScreen(vm: MainViewModel) {
     var selectedRestoreUri by remember { mutableStateOf<Uri?>(null) }
     var showExportPassword by remember { mutableStateOf(false) }
     var showRestorePassword by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/octet-stream")
@@ -206,8 +209,10 @@ internal fun BackupRestoreScreen(vm: MainViewModel) {
                 Text("Automatic backup", style = MaterialTheme.typography.titleMedium)
                 if (!autoBackup.enabled) {
                     Text(
-                        "After every finished match, into a folder you pick once (for example on Google Drive). " +
-                            "Uses the password above; the newest ${AutoBackupRules.KEEP} are kept.",
+                        "After every finished match, into a folder you pick once: on the phone, an SD card, or a " +
+                            "cloud app that offers folders there. Uses the password above; the newest " +
+                            "${AutoBackupRules.KEEP} are kept. Google Drive usually does not offer folders: use " +
+                            "\"Share latest backup\" afterwards to save a copy there.",
                         style = MaterialTheme.typography.bodySmall
                     )
                     AppButton(
@@ -240,6 +245,16 @@ internal fun BackupRestoreScreen(vm: MainViewModel) {
                         )
                         Text("Include video files", Modifier.weight(1f))
                     }
+                    if (autoBackup.includeMedia && recordedVideoBytes > 0L) {
+                        val oneBackup = BackupEstimate.estimatedBytes(recordedVideoBytes, true)
+                        Text(
+                            "Each automatic backup copies all recorded video (about ${BackupEstimate.humanReadable(oneBackup)}). " +
+                                "Keeping ${AutoBackupRules.KEEP} can take up to " +
+                                "${BackupEstimate.humanReadable(AutoBackupRules.keptBytes(oneBackup))} in the folder.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         AppTonalButton(
                             onClick = vm::runAutoBackupNow,
@@ -251,6 +266,19 @@ internal fun BackupRestoreScreen(vm: MainViewModel) {
                             enabled = !autoBackup.running,
                             modifier = Modifier.heightIn(min = 48.dp)
                         ) { Text("Turn off") }
+                    }
+                    if (autoBackup.lastSuccessEpochMs != null) {
+                        AppOutlinedButton(
+                            onClick = {
+                                scope.launch {
+                                    val latest = vm.latestAutoBackup()
+                                    if (latest == null) autoBackupMessage = "No automatic backup was found in the folder."
+                                    else ExternalApps.share(context, latest, "application/octet-stream", "MatchReview backup")
+                                }
+                            },
+                            enabled = !autoBackup.running,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                        ) { Text("Share latest backup (Drive, e-mail…)") }
                     }
                 }
                 autoBackupMessage?.let {

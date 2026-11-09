@@ -30,4 +30,22 @@ class AutoBackupRulesTest {
         assertTrue(earlier.startsWith(AutoBackupRules.PREFIX) && earlier.endsWith(AutoBackupRules.EXTENSION))
         assertTrue(earlier < later)
     }
+
+    @Test
+    fun `newest automatic backup is found by its timestamp name`() {
+        val names = listOf(
+            "matchreview-auto-20261001-101500.mrbak",
+            "my-own-backup.mrbak",
+            "matchreview-auto-20261108-090000.mrbak",
+            "matchreview-auto-20261020-180000.mrbak"
+        )
+        assertEquals("matchreview-auto-20261108-090000.mrbak", AutoBackupRules.newest(names))
+        assertEquals(null, AutoBackupRules.newest(listOf("my-own-backup.mrbak")))
+    }
+
+    @Test
+    fun `kept backups with video can take five times the video`() {
+        assertEquals(5_000L, AutoBackupRules.keptBytes(1_000L))
+        assertEquals(0L, AutoBackupRules.keptBytes(-1L))
+    }
 }

@@ -38,6 +38,14 @@ object AutoBackupRules {
      * Automatic backups beyond the newest [keep]; the timestamp in the name sorts in time order.
      * Files the coach saved by hand are never touched.
      */
+    /** The newest automatic backup among [names], if any. */
+    fun newest(names: List<String>): String? = names
+        .filter { it.startsWith(PREFIX) && it.endsWith(EXTENSION) }
+        .maxOrNull()
+
+    /** Space the kept automatic backups can take when each one copies all recorded video. */
+    fun keptBytes(oneBackupBytes: Long, keep: Int = KEEP): Long = oneBackupBytes.coerceAtLeast(0L) * keep
+
     fun toDelete(names: List<String>, keep: Int = KEEP): List<String> = names
         .filter { it.startsWith(PREFIX) && it.endsWith(EXTENSION) }
         .sortedDescending()
@@ -171,6 +179,35 @@ class AutoBackupController(
         } catch (error: Exception) {
             null
         } ?: throw BackupException("The backup folder can no longer be written. Choose the folder again.")
+    }
+
+    /** The newest automatic backup in the chosen folder, to share it to another app. */
+    suspend fun latestBackup(): Uri? = withContext(Dispatchers.IO) {
+        val tree = prefs.getString(KEY_FOLDER, null)?.let(Uri::parse) ?: return@withContext null
+        runCatching {
+            val documents = listDocuments(tree)
+            AutoBackupRules.newest(documents.keys.toList())?.let { name ->
+                DocumentsContract.buildDocumentUriUsingTree(tree, documents.getValue(name))
+            }
+        }.getOrNull()
+    }
+
+    private fun listDocuments(tree: Uri): Map<String, String> {
+        val parentId = DocumentsContract.getTreeDocumentId(tree)
+        val children = DocumentsContract.buildChildDocumentsUriUsingTree(tree, parentId)
+        val documents = mutableMapOf<String, String>()
+        context.contentResolver.query(
+            children,
+            arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_DISPLAY_NAME),
+            null, null, null
+        )?.use { cursor ->
+            while (cursor.moveToNext()) {
+                val id = cursor.getString(0) ?: continue
+                val name = cursor.getString(1) ?: continue
+                documents[name] = id
+            }
+        }
+        return documents
     }
 
     private fun deleteOldBackups(tree: Uri) {
