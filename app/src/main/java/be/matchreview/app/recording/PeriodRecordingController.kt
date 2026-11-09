@@ -10,6 +10,7 @@ import androidx.core.content.ContextCompat
 import be.matchreview.app.data.MatchStatus
 import be.matchreview.app.domain.PeriodRecordingRules
 import be.matchreview.app.domain.PeriodResume
+import be.matchreview.app.domain.RecordingStopMode
 import be.matchreview.app.domain.StorageBudgetRules
 import be.matchreview.app.domain.StorageHealthRules
 import kotlinx.coroutines.Dispatchers
@@ -28,18 +29,42 @@ import kotlinx.coroutines.withTimeoutOrNull
 class PeriodRecordingController(private val context: Context) {
     private val preferences = context.getSharedPreferences("period_recording", Context.MODE_PRIVATE)
 
-    private val _enabled = MutableStateFlow(preferences.getBoolean(KEY_ENABLED, true))
-    /** Whether recordings stop at a period end and restart with the next period. */
-    val enabled: StateFlow<Boolean> = _enabled.asStateFlow()
+    private val _mode = MutableStateFlow(
+        // Older versions stored an on/off switch for stopping at the period end.
+        if (preferences.contains(KEY_MODE)) RecordingStopMode.fromName(preferences.getString(KEY_MODE, null))
+        else if (preferences.getBoolean(KEY_ENABLED, true)) RecordingStopMode.PERIOD_END
+        else RecordingStopMode.MANUAL
+    )
+    /** When recordings stop by themselves; all but manual restart with the next period. */
+    val mode: StateFlow<RecordingStopMode> = _mode.asStateFlow()
+    private val enabled: Boolean get() = _mode.value.followsPeriods
 
     private val _pending = MutableStateFlow(PeriodRecordingRules.decode(preferences.getString(KEY_PENDING, null)))
     /** A recording that was stopped at a period end and restarts with the next period. */
     val pending: StateFlow<PeriodResume?> = _pending.asStateFlow()
 
-    fun setEnabled(value: Boolean) {
-        preferences.edit().putBoolean(KEY_ENABLED, value).apply()
-        _enabled.value = value
-        if (!value) setPending(null)
+    fun setMode(value: RecordingStopMode) {
+        preferences.edit().putString(KEY_MODE, value.name).apply()
+        _mode.value = value
+        if (!value.followsPeriods) setPending(null)
+    }
+
+    /**
+     * Call when the planned time of the current period of [matchId] is reached, at
+     * [endMatchClockMs] match time. Saves the running recording when the coach chose to
+     * stop filming then; it restarts with the next period.
+     */
+    fun onPlannedTimeReached(matchId: Long, endMatchClockMs: Long) {
+        val recording = CameraRecordingController.state.value as? CameraRecordingState.Recording
+        if (!PeriodRecordingRules.stopsAtPlannedTime(_mode.value, recording?.matchId, matchId)) return
+        setPending(
+            PeriodResume(
+                matchId = matchId,
+                audioEnabled = recording!!.audioEnabled,
+                frontLens = CameraRecordingController.lens.value == CameraLens.FRONT
+            )
+        )
+        MatchRecordingService.requestStop(context, endMatchClockMs)
     }
 
     /**
@@ -48,7 +73,7 @@ class PeriodRecordingController(private val context: Context) {
      */
     fun prepareForPeriodEnd(matchId: Long): Boolean {
         val recording = CameraRecordingController.state.value as? CameraRecordingState.Recording
-        if (!PeriodRecordingRules.stopsAtPeriodEnd(_enabled.value, recording?.matchId, matchId)) return false
+        if (!PeriodRecordingRules.stopsAtPeriodEnd(enabled, recording?.matchId, matchId)) return false
         setPending(
             PeriodResume(
                 matchId = matchId,
@@ -76,7 +101,7 @@ class PeriodRecordingController(private val context: Context) {
         periodStartedMonotonicMs: Long
     ) {
         val resume = _pending.value
-        if (!PeriodRecordingRules.resumesAtPeriodStart(_enabled.value, resume, matchId, status)) return
+        if (!PeriodRecordingRules.resumesAtPeriodStart(enabled, resume, matchId, status)) return
         setPending(null)
         resume!!
 
@@ -135,6 +160,7 @@ class PeriodRecordingController(private val context: Context) {
 
     private companion object {
         const val KEY_ENABLED = "follow_periods"
+        const val KEY_MODE = "stop_mode"
         const val KEY_PENDING = "pending_resume"
         const val SAVE_WAIT_MS = 20_000L
     }

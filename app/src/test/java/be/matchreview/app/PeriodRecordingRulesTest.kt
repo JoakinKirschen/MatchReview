@@ -3,6 +3,7 @@ package be.matchreview.app
 import be.matchreview.app.data.MatchStatus
 import be.matchreview.app.domain.PeriodRecordingRules
 import be.matchreview.app.domain.PeriodResume
+import be.matchreview.app.domain.RecordingStopMode
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -60,5 +61,29 @@ class PeriodRecordingRulesTest {
         assertNull(PeriodRecordingRules.decode("x|1|BACK"))
         assertNull(PeriodRecordingRules.decode("0|1|BACK"))
         assertNull(PeriodRecordingRules.decode("4|1"))
+    }
+
+    @Test
+    fun `planned time stops only when chosen and only that match`() {
+        assertTrue(PeriodRecordingRules.stopsAtPlannedTime(RecordingStopMode.PLANNED_TIME, 4, 4))
+        assertFalse(PeriodRecordingRules.stopsAtPlannedTime(RecordingStopMode.PERIOD_END, 4, 4))
+        assertFalse(PeriodRecordingRules.stopsAtPlannedTime(RecordingStopMode.MANUAL, 4, 4))
+        assertFalse(PeriodRecordingRules.stopsAtPlannedTime(RecordingStopMode.PLANNED_TIME, 5, 4))
+        assertFalse(PeriodRecordingRules.stopsAtPlannedTime(RecordingStopMode.PLANNED_TIME, null, 4))
+    }
+
+    @Test
+    fun `planned end is the period start plus its planned length`() {
+        // 32 minutes played, 2 of them in this 15-minute period that started at 30:00.
+        assertEquals(2_700_000L, PeriodRecordingRules.plannedEndMatchMs(1_920_000L, 120_000L, 900_000L))
+    }
+
+    @Test
+    fun `stop modes restart with the next period except manual`() {
+        assertTrue(RecordingStopMode.PERIOD_END.followsPeriods)
+        assertTrue(RecordingStopMode.PLANNED_TIME.followsPeriods)
+        assertFalse(RecordingStopMode.MANUAL.followsPeriods)
+        assertEquals(RecordingStopMode.PERIOD_END, RecordingStopMode.fromName(null))
+        assertEquals(RecordingStopMode.PLANNED_TIME, RecordingStopMode.fromName("PLANNED_TIME"))
     }
 }

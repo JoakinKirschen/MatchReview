@@ -120,7 +120,7 @@ fun LiveMatchScreen(
     val cameraState by CameraRecordingController.state.collectAsStateWithLifecycle()
     val recordingThisMatch = cameraState.activeMatchId == matchId
     val pendingPeriodResume by vm.pendingPeriodRecording.collectAsStateWithLifecycle()
-    val recordingFollowsPeriods by vm.recordingFollowsPeriods.collectAsStateWithLifecycle()
+    val recordingStopMode by vm.recordingStopMode.collectAsStateWithLifecycle()
     DisposableEffect(current.status) {
         val previous = view.keepScreenOn
         view.keepScreenOn = current.status in setOf(
@@ -497,8 +497,10 @@ fun LiveMatchScreen(
             state = cameraState,
             matchId = matchId,
             restartsWithPeriod = pendingPeriodResume?.matchId == matchId &&
-                current.status == MatchStatus.PERIOD_ENDED &&
+                current.status in setOf(MatchStatus.LIVE, MatchStatus.PAUSED, MatchStatus.PERIOD_ENDED) &&
                 current.currentPeriod < current.periodCount,
+            // Stopped at the planned time while play goes on (added time).
+            stoppedInPlay = current.status != MatchStatus.PERIOD_ENDED,
             nextPeriod = current.currentPeriod + 1,
             onClick = { tab = LiveTab.CAMERA }
         )
@@ -664,8 +666,8 @@ fun LiveMatchScreen(
                 matchId = matchId,
                 matchClockMs = matchTimeMs,
                 recordings = recordings,
-                followPeriods = recordingFollowsPeriods,
-                onFollowPeriodsChange = vm::setRecordingFollowsPeriods,
+                stopMode = recordingStopMode,
+                onStopModeChange = vm::setRecordingStopMode,
                 onWatchVideo = { showFullVideo = true },
                 onMarkMoment = { recordAction(MatchActions.MARK, null) },
                 modifier = Modifier.weight(1f).fillMaxWidth()
@@ -1186,7 +1188,7 @@ fun LiveMatchScreen(
             title = { Text("End period ${current.currentPeriod}?") },
             text = {
                 Text(
-                    if (recordingThisMatch && recordingFollowsPeriods) {
+                    if (recordingThisMatch && recordingStopMode.followsPeriods) {
                         "The match clock will stop and the video of this period is saved. " +
                             "Recording starts again when you start the next period."
                     } else "The match clock will stop. You can start the next period afterward."
@@ -1301,13 +1303,20 @@ private fun RecordingStatusChip(
     matchId: Long,
     /** The recording was saved at the period end and starts again with the next period. */
     restartsWithPeriod: Boolean,
+    stoppedInPlay: Boolean,
     nextPeriod: Int,
     onClick: () -> Unit
 ) {
     if (restartsWithPeriod && state !is CameraRecordingState.Error && state.activeMatchId == null) {
         AssistChip(
             onClick = onClick,
-            label = { Text("Camera paused • records again when period $nextPeriod starts", maxLines = 1) },
+            label = {
+                Text(
+                    if (stoppedInPlay) "Time is up • camera records again when period $nextPeriod starts"
+                    else "Camera paused • records again when period $nextPeriod starts",
+                    maxLines = 1
+                )
+            },
             modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
             colors = AssistChipDefaults.assistChipColors(
                 containerColor = MaterialTheme.colorScheme.secondaryContainer

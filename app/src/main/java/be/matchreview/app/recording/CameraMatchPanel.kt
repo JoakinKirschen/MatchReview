@@ -54,6 +54,7 @@ import be.matchreview.app.data.RecordingStatus
 import be.matchreview.app.domain.MatchClockCalculator
 import be.matchreview.app.domain.StorageHealthRules
 import be.matchreview.app.domain.StorageBudgetRules
+import be.matchreview.app.domain.RecordingStopMode
 import be.matchreview.app.domain.StorageLevel
 import be.matchreview.app.ui.isLandscape
 import kotlinx.coroutines.delay
@@ -63,9 +64,9 @@ fun CameraMatchPanel(
     matchId: Long,
     matchClockMs: Long,
     recordings: List<RecordingSegment>,
-    /** Whether recording stops at each period end and restarts with the next period. */
-    followPeriods: Boolean,
-    onFollowPeriodsChange: (Boolean) -> Unit,
+    /** When filming stops by itself, and so whether it restarts with the next period. */
+    stopMode: RecordingStopMode,
+    onStopModeChange: (RecordingStopMode) -> Unit,
     /** Opens all saved clips of the match as one video. */
     onWatchVideo: () -> Unit,
     /** Flags the current moment so it is easy to find in the video later. */
@@ -391,59 +392,55 @@ fun CameraMatchPanel(
             )
         }
         val hasSavedClips = saved.any { !it.uri.isNullOrBlank() }
-        val followSwitch: @Composable () -> Unit = {
-            Switch(
-                checked = followPeriods,
-                onCheckedChange = onFollowPeriodsChange,
-                modifier = Modifier.semantics {
-                    contentDescription = "Stop recording at each period end and restart with the next period"
+        val stopModeMenu: @Composable (Boolean) -> Unit = { compact ->
+            var open by remember { mutableStateOf(false) }
+            Box {
+                TextButton(
+                    onClick = { open = true },
+                    contentPadding = PaddingValues(horizontal = 8.dp),
+                    modifier = Modifier.semantics {
+                        contentDescription = "Stop filming: ${stopMode.label}. Tap to change"
+                    }
+                ) {
+                    Text(
+                        if (compact) "Stop: ${stopMode.shortLabel} ▾" else "Stop filming: ${stopMode.shortLabel} ▾",
+                        maxLines = 1
+                    )
                 }
-            )
-        }
-        if (isLandscape()) {
-            // One row, so the sideways preview keeps as much height as possible.
-            Row(
-                Modifier.fillMaxWidth().heightIn(min = 40.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                clipSummary(Modifier.weight(1f))
-                if (hasSavedClips) TextButton(onClick = onWatchVideo) { Text("Watch") }
-                Text(
-                    "Pause between periods",
-                    style = MaterialTheme.typography.labelMedium,
-                    maxLines = 2,
-                    modifier = Modifier.widthIn(max = 96.dp)
-                )
-                followSwitch()
-            }
-        } else {
-            Row(
-                Modifier.fillMaxWidth().heightIn(min = 40.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                clipSummary(Modifier.weight(1f))
-                if (hasSavedClips) TextButton(onClick = onWatchVideo) { Text("Watch video") }
-            }
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 40.dp)
-                    .clickable { onFollowPeriodsChange(!followPeriods) }
-                    .padding(horizontal = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text(
-                    "Stop at each period end, record again when the next period starts",
-                    style = MaterialTheme.typography.labelMedium,
-                    maxLines = 2,
-                    modifier = Modifier.weight(1f)
-                )
-                followSwitch()
+                DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+                    RecordingStopMode.entries.forEach { mode ->
+                        DropdownMenuItem(
+                            text = {
+                                Column {
+                                    Text(mode.label, fontWeight = if (mode == stopMode) FontWeight.Bold else null)
+                                    if (mode.followsPeriods) {
+                                        Text("Records again when the next period starts", style = MaterialTheme.typography.bodySmall)
+                                    }
+                                }
+                            },
+                            onClick = {
+                                open = false
+                                onStopModeChange(mode)
+                            }
+                        )
+                    }
+                }
             }
         }
+        val landscape = isLandscape()
+        // One row in landscape, so the sideways preview keeps as much height as possible.
+        Row(
+            Modifier.fillMaxWidth().heightIn(min = 40.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            clipSummary(Modifier.weight(1f))
+            if (hasSavedClips) TextButton(onClick = onWatchVideo, contentPadding = PaddingValues(horizontal = 8.dp)) {
+                Text(if (landscape) "Watch" else "Watch video")
+            }
+            if (landscape) stopModeMenu(true)
+        }
+        if (!landscape) Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) { stopModeMenu(false) }
 
         permissionMessage?.let { message ->
             Surface(

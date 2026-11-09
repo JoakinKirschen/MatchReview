@@ -22,6 +22,7 @@ import be.matchreview.app.data.MatchStatus
 import be.matchreview.app.data.Team
 import be.matchreview.app.domain.LiveClockRules
 import be.matchreview.app.domain.MatchClockCalculator
+import be.matchreview.app.domain.PeriodRecordingRules
 import be.matchreview.app.domain.PeriodTimeRules
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
@@ -118,11 +119,19 @@ class MatchClockService : LifecycleService() {
             else -> builder.setContentText("$period • paused at ${MatchClockCalculator.formatClock(clock.periodTimeMs)}")
         }
         notify(CLOCK_NOTIFICATION_ID, builder.build())
-        schedulePeriodAlert(match, clock.msUntilPeriodEnd, clock.periodTimeMs, clock.plannedPeriodMs, clock.running)
+        schedulePeriodAlert(match, clock.matchTimeMs, clock.msUntilPeriodEnd, clock.periodTimeMs, clock.plannedPeriodMs, clock.running)
+    }
+
+    /** Lets the camera stop at the planned time, if the coach chose that. */
+    private fun plannedTimeReached(match: GameMatch, matchTimeMs: Long, periodTimeMs: Long, plannedMs: Long) {
+        app.periodRecording.onPlannedTimeReached(
+            match.id, PeriodRecordingRules.plannedEndMatchMs(matchTimeMs, periodTimeMs, plannedMs)
+        )
     }
 
     private fun schedulePeriodAlert(
         match: GameMatch,
+        matchTimeMs: Long,
         msUntilEnd: Long?,
         periodTimeMs: Long,
         plannedMs: Long,
@@ -136,7 +145,10 @@ class MatchClockService : LifecycleService() {
         }
         if (msUntilEnd == null) {
             // Already over: alert only if it just happened (for example the app was restarted).
-            if (PeriodTimeRules.shouldAlert(periodTimeMs, plannedMs, alreadyAlerted = false)) alert(match)
+            if (PeriodTimeRules.shouldAlert(periodTimeMs, plannedMs, alreadyAlerted = false)) {
+                alert(match)
+                plannedTimeReached(match, matchTimeMs, periodTimeMs, plannedMs)
+            }
             releaseWakeLock()
             return
         }
@@ -145,6 +157,7 @@ class MatchClockService : LifecycleService() {
         alertJob = lifecycleScope.launch {
             delay(msUntilEnd)
             alert(match)
+            plannedTimeReached(match, matchTimeMs, periodTimeMs, plannedMs)
             releaseWakeLock()
         }
     }

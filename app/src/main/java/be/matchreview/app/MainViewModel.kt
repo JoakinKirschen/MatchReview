@@ -21,6 +21,7 @@ import be.matchreview.app.domain.StatAdjustments
 import be.matchreview.app.domain.StatLine
 import be.matchreview.app.domain.BackupReminderRules
 import be.matchreview.app.domain.PeriodResume
+import be.matchreview.app.domain.RecordingStopMode
 import be.matchreview.app.recording.MatchRecordingService
 import be.matchreview.app.ui.ThemeMode
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -419,12 +420,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         repository.resumeMatchClock(matchId, now, System.currentTimeMillis())
     }
 
-    /** Whether the camera stops at each period end and restarts with the next period. */
-    val recordingFollowsPeriods: StateFlow<Boolean> = periodRecording.enabled
+    /** When the camera stops by itself; all but manual restart with the next period. */
+    val recordingStopMode: StateFlow<RecordingStopMode> = periodRecording.mode
     /** A recording stopped at a period end that restarts when the next period starts. */
     val pendingPeriodRecording: StateFlow<PeriodResume?> = periodRecording.pending
 
-    fun setRecordingFollowsPeriods(enabled: Boolean) = periodRecording.setEnabled(enabled)
+    fun setRecordingStopMode(mode: RecordingStopMode) = periodRecording.setMode(mode)
 
     fun endCurrentPeriod(matchId: Long) = viewModelScope.launch {
         val stopCamera = periodRecording.prepareForPeriodEnd(matchId)
