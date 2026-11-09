@@ -17,6 +17,7 @@ interface MatchDao {
     fun observeTeams(): Flow<List<Team>>
 
     @Insert suspend fun insertTeam(team: Team): Long
+    @Update suspend fun updateTeam(team: Team)
     @Delete suspend fun deleteTeam(team: Team)
 
     @Query("UPDATE teams SET logoPng = :logoPng WHERE id = :teamId")

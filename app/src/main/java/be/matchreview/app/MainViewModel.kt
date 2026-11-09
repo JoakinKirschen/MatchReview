@@ -259,6 +259,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { repository.addTeam(name, club, age, season); done() }
     }
 
+    fun updateTeam(team: Team, done: () -> Unit = {}) {
+        if (team.name.isBlank()) return
+        viewModelScope.launch {
+            repository.updateTeam(team)
+            done()
+        }
+    }
+
     fun addPlayer(teamId: Long, name: String, number: Int, position: String, done: () -> Unit) {
         if (name.isBlank()) return
         viewModelScope.launch { repository.addPlayer(teamId, name, number, position); done() }

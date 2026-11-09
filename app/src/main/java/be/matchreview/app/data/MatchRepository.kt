@@ -164,6 +164,16 @@ class MatchRepository(private val dao: MatchDao) {
 
     suspend fun deleteTeam(team: Team) = dao.deleteTeam(team)
 
+    /** Saves a changed name, club, age group or season; the logo, players and matches stay. */
+    suspend fun updateTeam(team: Team) = dao.updateTeam(
+        team.copy(
+            name = team.name.trim(),
+            club = team.club.trim(),
+            ageGroup = team.ageGroup.trim(),
+            season = team.season.trim()
+        )
+    )
+
     suspend fun setTeamLogo(teamId: Long, logoPng: String?) = dao.updateTeamLogo(teamId, logoPng)
 
     suspend fun updateMatchDetails(

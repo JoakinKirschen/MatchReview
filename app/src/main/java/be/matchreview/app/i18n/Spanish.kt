@@ -2,7 +2,7 @@ package be.matchreview.app.i18n
 
 /** Spanish football usage for every text wrapped in [tr], keyed by the English text. Generated from a numbered list. */
 internal object Spanish {
-    val texts: Map<String, String> = HashMap<String, String>(1560).apply {
+    val texts: Map<String, String> = HashMap<String, String>(1564).apply {
         put(" (assist {value})", " (asistencia {value})")
         put(" - {time} total", " - {time} en total")
         put(" to Movies/MatchReview", " en Movies/MatchReview")
@@ -783,5 +783,7 @@ internal object Spanish {
         put("▼ Off: {outgoingPlayerIds}", "▼ Salen: {outgoingPlayerIds}")
         put("● REC {time}", "● REC {time}")
         put("Language", "Idioma")
+        put("Edit team", "Editar equipo")
+        put("Matches, players and the logo stay with the team.", "Los partidos, los jugadores y el escudo se quedan con el equipo.")
     }
 }

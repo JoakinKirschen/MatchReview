@@ -2,7 +2,7 @@ package be.matchreview.app.i18n
 
 /** Turkish football usage for every text wrapped in [tr], keyed by the English text. Generated from a numbered list. */
 internal object Turkish {
-    val texts: Map<String, String> = HashMap<String, String>(1560).apply {
+    val texts: Map<String, String> = HashMap<String, String>(1564).apply {
         put(" (assist {value})", " (asist: {value})")
         put(" - {time} total", " - toplam {time}")
         put(" to Movies/MatchReview", " Movies/MatchReview klasörüne")
@@ -783,5 +783,7 @@ internal object Turkish {
         put("▼ Off: {outgoingPlayerIds}", "▼ Çıkanlar: {outgoingPlayerIds}")
         put("● REC {time}", "● KAYIT {time}")
         put("Language", "Dil")
+        put("Edit team", "Takımı düzenle")
+        put("Matches, players and the logo stay with the team.", "Maçlar, oyuncular ve logo takımda kalır.")
     }
 }

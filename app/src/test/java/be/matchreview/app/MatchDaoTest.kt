@@ -98,6 +98,25 @@ class MatchDaoTest {
     }
 
     @Test
+    fun renamingTeamKeepsItsLogoPlayersAndMatches() = runBlocking {
+        val fixture = liveMatch()
+        val repository = MatchRepository(dao)
+        repository.setTeamLogo(fixture.teamId, "logo")
+        val before = dao.observeTeams().first().single { it.id == fixture.teamId }
+
+        repository.updateTeam(before.copy(name = "  U13 Lions ", club = "FC New ", ageGroup = "U13", season = "2027/28"))
+
+        val after = dao.observeTeams().first().single { it.id == fixture.teamId }
+        assertEquals("U13 Lions", after.name)
+        assertEquals("FC New", after.club)
+        assertEquals("U13", after.ageGroup)
+        assertEquals("2027/28", after.season)
+        assertEquals("logo", after.logoPng)
+        assertEquals(fixture.playerIds.size, dao.getPlayersForTeam(fixture.teamId).size)
+        assertEquals(fixture.teamId, dao.getMatchOnce(fixture.matchId)!!.teamId)
+    }
+
+    @Test
     fun deletingGoalFromTimelineUpdatesScore() = runBlocking {
         val fixture = liveMatch()
         dao.recordOurGoal(fixture.matchId, fixture.playerIds[0], null, KICK_OFF_MONOTONIC + 60_000, KICK_OFF_WALL + 60_000)

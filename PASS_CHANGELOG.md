@@ -1,7 +1,7 @@
 # MatchReview Pass Changelog
 
 This is the **single source of truth** for implementation-pass notes and change tracking.
-It consolidates implementation notes for Passes 1–68.
+It consolidates implementation notes for Passes 1–69.
 
 ## How to maintain this file
 
@@ -37,7 +37,7 @@ For every future development pass:
 
 | Pass | Status | Planned change | Version impact |
 |---:|---|---|---|
-| 69 | Not scheduled | Add the next approved recommendation here | To be determined |
+| 70 | Not scheduled | Add the next approved recommendation here | To be determined |
 
 ## Documentation changes
 
@@ -1552,4 +1552,19 @@ begin.
 
 ### Tests and verification
 - `LanguageSettingsTest` (Robolectric, API 34) checks both directions of the language sync. A release build was signed with a throwaway key and verified with `apksigner`; without a key it builds unsigned.
+
+## Pass 69 — Edit a team's name, club, age group and season
+
+**Status:** Completed  
+**Completed:** 2026-11-09  
+**Version impact:** None (database schema unchanged)
+
+### Added or changed
+- "Edit team" on the team screen opens a dialog for the name, club, age group and season. The logo, players and matches stay with the team. The practice team cannot be edited, because it is recognised by its name and season.
+- The team screen shows the club, age group and season under the name; its buttons wrap onto a second line when a translation is long.
+- `MatchDao.updateTeam` and `MatchRepository.updateTeam` (trims the texts). Translated into all six languages.
+
+### Tests and verification
+- `MatchDaoTest.renamingTeamKeepsItsLogoPlayersAndMatches`; all 239 unit tests pass.
+- A screenshot of the dialog could not be rendered: in Robolectric at 360 dp hdpi, any Material `AlertDialog` with four labelled text fields never becomes idle, also without app code. The same dialog layout is used by the existing player editor.
 

@@ -2,7 +2,7 @@ package be.matchreview.app.i18n
 
 /** German football usage for every text wrapped in [tr], keyed by the English text. Generated from a numbered list. */
 internal object German {
-    val texts: Map<String, String> = HashMap<String, String>(1560).apply {
+    val texts: Map<String, String> = HashMap<String, String>(1564).apply {
         put(" (assist {value})", " (Vorlage {value})")
         put(" - {time} total", " - {time} insgesamt")
         put(" to Movies/MatchReview", " in Movies/MatchReview")
@@ -783,5 +783,7 @@ internal object German {
         put("▼ Off: {outgoingPlayerIds}", "▼ Raus: {outgoingPlayerIds}")
         put("● REC {time}", "● REC {time}")
         put("Language", "Sprache")
+        put("Edit team", "Mannschaft bearbeiten")
+        put("Matches, players and the logo stay with the team.", "Spiele, Spieler und das Logo bleiben bei der Mannschaft.")
     }
 }

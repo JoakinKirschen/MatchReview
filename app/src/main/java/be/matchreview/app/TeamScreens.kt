@@ -86,6 +86,7 @@ internal fun NewTeamScreen(vm: MainViewModel, nav: NavHostController) {
 }
 
 @Composable
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 internal fun TeamScreen(teamId: Long, vm: MainViewModel, nav: NavHostController) {
     val team = vm.teams.collectAsStateWithLifecycle().value.firstOrNull { it.id == teamId }
     val players by vm.playersForTeam(teamId).collectAsStateWithLifecycle(initialValue = emptyList())
@@ -98,6 +99,9 @@ internal fun TeamScreen(teamId: Long, vm: MainViewModel, nav: NavHostController)
     var editingPlayer by remember { mutableStateOf<Player?>(null) }
     var editingStats by remember { mutableStateOf<be.matchreview.app.domain.PlayerSeasonStats?>(null) }
     var showDeleteTeam by remember { mutableStateOf(false) }
+    var showEditTeam by remember { mutableStateOf(false) }
+    // The practice team is recognised by its name and season, so those stay as they are.
+    val editable = team != null && !be.matchreview.app.domain.PracticeMatchRules.isPracticeTeam(team)
     val context = LocalContext.current
     val clipDeleter = rememberClipDeleter()
     val cameraState by CameraRecordingController.state.collectAsStateWithLifecycle()
@@ -185,7 +189,22 @@ internal fun TeamScreen(teamId: Long, vm: MainViewModel, nav: NavHostController)
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
-                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        team?.let { listOf(it.club, it.ageGroup, it.season) }
+                            ?.filter(String::isNotBlank)
+                            ?.takeIf { it.isNotEmpty() }
+                            ?.let {
+                                Text(
+                                    it.joinToString(" • "),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            if (editable) {
+                                TextButton(onClick = { showEditTeam = true }) { Text(tr("Edit team")) }
+                            }
                             Box {
                                 TextButton(
                                     onClick = { logoSourceMenu = true },
@@ -353,6 +372,14 @@ internal fun TeamScreen(teamId: Long, vm: MainViewModel, nav: NavHostController)
                 vm.correctSeasonStats(stats, null)
                 editingStats = null
             }
+        )
+    }
+
+    if (showEditTeam && team != null) {
+        EditTeamDialog(
+            team = team,
+            onDismiss = { showEditTeam = false },
+            onSave = { changed -> vm.updateTeam(changed) { showEditTeam = false } }
         )
     }
 
@@ -536,6 +563,38 @@ internal fun PlayerStatsDialog(
                     )
                 )
             }) { Text(tr("Save")) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(tr("Cancel")) } }
+    )
+}
+
+/** Name, club, age group and season of a team; its logo, players and matches stay. */
+@Composable
+private fun EditTeamDialog(team: Team, onDismiss: () -> Unit, onSave: (Team) -> Unit) {
+    var name by remember(team.id) { mutableStateOf(team.name) }
+    var club by remember(team.id) { mutableStateOf(team.club) }
+    var age by remember(team.id) { mutableStateOf(team.ageGroup) }
+    var season by remember(team.id) { mutableStateOf(team.season) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(tr("Edit team")) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Field(name, { name = it }, tr("Team name"))
+                Field(club, { club = it }, tr("Club"))
+                Field(age, { age = it }, tr("Age group"))
+                Field(season, { season = it }, tr("Season"))
+                Text(
+                    tr("Matches, players and the logo stay with the team."),
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onSave(team.copy(name = name, club = club, ageGroup = age, season = season)) },
+                enabled = name.isNotBlank()
+            ) { Text(tr("Save team")) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(tr("Cancel")) } }
     )

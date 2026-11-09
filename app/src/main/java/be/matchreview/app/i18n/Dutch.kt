@@ -5,7 +5,7 @@ package be.matchreview.app.i18n
  * A missing entry shows the English text; TranslationCoverageTest lists any that are missing.
  */
 internal object Dutch {
-    val texts: Map<String, String> = HashMap<String, String>(1560).apply {
+    val texts: Map<String, String> = HashMap<String, String>(1564).apply {
         put(" (assist {value})", " (assist {value})")
         put(" - {time} total", " - {time} in totaal")
         put(" to Movies/MatchReview", " in Movies/MatchReview")
@@ -184,6 +184,7 @@ internal object Dutch {
         put("Edit opponent goal", "Doelpunt tegenstander wijzigen")
         put("Edit player", "Speler wijzigen")
         put("Edit squad", "Selectie wijzigen")
+        put("Edit team", "Team wijzigen")
         put("Encrypted backups to this phone, Google Drive or another storage app.", "Versleutelde back-ups op deze telefoon, Google Drive of een andere opslag-app.")
         put("End period", "Periode beëindigen")
         put("End period {currentPeriod}?", "Periode {currentPeriod} beëindigen?")
@@ -308,6 +309,7 @@ internal object Dutch {
         put("Match {time}–", "Wedstrijd {time}–")
         put("Match-day check", "Controle wedstrijddag")
         put("Matches", "Wedstrijden")
+        put("Matches, players and the logo stay with the team.", "Wedstrijden, spelers en het logo blijven bij het team.")
         put("MatchReview backup", "MatchReview-back-up")
         put("MatchReview camera", "MatchReview-camera")
         put("middle left", "links halfhoog")

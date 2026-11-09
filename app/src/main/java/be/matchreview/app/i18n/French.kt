@@ -2,7 +2,7 @@ package be.matchreview.app.i18n
 
 /** French (Belgian and French football usage) for every text wrapped in [tr], keyed by the English text. Generated from a numbered list. */
 internal object French {
-    val texts: Map<String, String> = HashMap<String, String>(1560).apply {
+    val texts: Map<String, String> = HashMap<String, String>(1564).apply {
         put(" (assist {value})", " (passe décisive {value})")
         put(" - {time} total", " - {time} au total")
         put(" to Movies/MatchReview", " dans Movies/MatchReview")
@@ -783,5 +783,7 @@ internal object French {
         put("▼ Off: {outgoingPlayerIds}", "▼ Sortent : {outgoingPlayerIds}")
         put("● REC {time}", "● REC {time}")
         put("Language", "Langue")
+        put("Edit team", "Modifier l'équipe")
+        put("Matches, players and the logo stay with the team.", "Les matchs, les joueurs et le logo restent avec l'équipe.")
     }
 }
