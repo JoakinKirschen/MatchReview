@@ -1,5 +1,7 @@
 package be.matchreview.app
 
+import be.matchreview.app.i18n.tr
+
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -62,7 +64,7 @@ class MatchClockService : LifecycleService() {
         // Android requires the foreground notification right after a foreground start.
         val started = runCatching {
             ServiceCompat.startForeground(
-                this, CLOCK_NOTIFICATION_ID, baseNotification(null).setContentText("Match in progress").build(),
+                this, CLOCK_NOTIFICATION_ID, baseNotification(null).setContentText(tr("Match in progress")).build(),
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
                     ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE else 0
             )
@@ -133,30 +135,30 @@ class MatchClockService : LifecycleService() {
             match, snapshot.segments, snapshot.periods,
             SystemClock.elapsedRealtime(), System.currentTimeMillis()
         )
-        val teamName = snapshot.teams.firstOrNull { it.id == match.teamId }?.name ?: "Our team"
-        val period = "Period ${match.currentPeriod} of ${match.periodCount}"
+        val teamName = snapshot.teams.firstOrNull { it.id == match.teamId }?.name ?: tr("Our team")
+        val period = tr("Period {currentPeriod} of {periodCount}", "currentPeriod" to match.currentPeriod, "periodCount" to match.periodCount)
         val builder = baseNotification(match.id)
             .setContentTitle("$teamName ${match.ourScore}–${match.opponentScore} ${match.opponent}")
         when {
             match.status == MatchStatus.PERIOD_ENDED ->
-                builder.setContentText("Break after period ${match.currentPeriod} • ${MatchClockCalculator.formatClock(clock.matchTimeMs)} played")
+                builder.setContentText(tr("Break after period {currentPeriod} • {time} played", "currentPeriod" to match.currentPeriod, "time" to (MatchClockCalculator.formatClock(clock.matchTimeMs))))
             clock.running -> {
                 val overtime = PeriodTimeRules.isOver(clock.periodTimeMs, clock.plannedPeriodMs)
                 builder
-                    .setContentText(if (overtime) "$period • time is up" else "$period • ${clock.plannedPeriodMs / 60_000} min")
+                    .setContentText(if (overtime) tr("{period} • time is up", "period" to period) else tr("{period} • {minutes} min", "period" to period, "minutes" to (clock.plannedPeriodMs / 60_000)))
                     .setUsesChronometer(true)
                     .setShowWhen(true)
                     .setWhen(System.currentTimeMillis() - clock.periodTimeMs)
             }
-            else -> builder.setContentText("$period • paused at ${MatchClockCalculator.formatClock(clock.periodTimeMs)}")
+            else -> builder.setContentText(tr("{period} • paused at {time}", "period" to period, "time" to (MatchClockCalculator.formatClock(clock.periodTimeMs))))
         }
         // Goals and the clock can be handled from the lock screen; details are added later in the app.
         if (match.status == MatchStatus.LIVE || match.status == MatchStatus.PAUSED) {
             builder
-                .addAction(0, "Our goal", actionIntent(ACTION_OUR_GOAL, match.id, 21))
-                .addAction(0, "Their goal", actionIntent(ACTION_THEIR_GOAL, match.id, 22))
-            if (clock.running) builder.addAction(0, "Pause", actionIntent(ACTION_PAUSE, match.id, 23))
-            else builder.addAction(0, "Resume", actionIntent(ACTION_RESUME, match.id, 24))
+                .addAction(0, tr("Our goal"), actionIntent(ACTION_OUR_GOAL, match.id, 21))
+                .addAction(0, tr("Their goal"), actionIntent(ACTION_THEIR_GOAL, match.id, 22))
+            if (clock.running) builder.addAction(0, tr("Pause"), actionIntent(ACTION_PAUSE, match.id, 23))
+            else builder.addAction(0, tr("Resume"), actionIntent(ACTION_RESUME, match.id, 24))
         }
         notify(CLOCK_NOTIFICATION_ID, builder.build())
         schedulePeriodAlert(match, clock.matchTimeMs, clock.msUntilPeriodEnd, clock.periodTimeMs, clock.plannedPeriodMs, clock.running)
@@ -205,13 +207,13 @@ class MatchClockService : LifecycleService() {
     private fun alert(match: GameMatch) {
         if (!MatchAlerts.claimPeriodAlert(this, match.id, match.currentPeriod)) return
         MatchAlerts.vibratePeriodEnd(this)
-        val period = if (match.currentPeriod >= match.periodCount) "The last period" else "Period ${match.currentPeriod}"
+        val period = if (match.currentPeriod >= match.periodCount) tr("The last period") else tr("Period {currentPeriod}", "currentPeriod" to match.currentPeriod)
         notify(
             ALERT_NOTIFICATION_ID,
             NotificationCompat.Builder(this, ALERT_CHANNEL_ID)
                 .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
-                .setContentTitle("$period time is up")
-                .setContentText("${match.periodDurationMinutes} minutes played. End the period in MatchReview.")
+                .setContentTitle(tr("{period} time is up", "period" to period))
+                .setContentText(tr("{minutes} minutes played. End the period in MatchReview.", "minutes" to match.periodDurationMinutes))
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setCategory(NotificationCompat.CATEGORY_ALARM)
                 .setContentIntent(openIntent(match.id))
@@ -275,12 +277,12 @@ class MatchClockService : LifecycleService() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val manager = getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(
-            NotificationChannel(CLOCK_CHANNEL_ID, "Match clock", NotificationManager.IMPORTANCE_LOW)
-                .apply { description = "The running match clock and score" }
+            NotificationChannel(CLOCK_CHANNEL_ID, tr("Match clock"), NotificationManager.IMPORTANCE_LOW)
+                .apply { description = tr("The running match clock and score") }
         )
         manager.createNotificationChannel(
-            NotificationChannel(ALERT_CHANNEL_ID, "Period end", NotificationManager.IMPORTANCE_HIGH).apply {
-                description = "Alerts when the planned period time is reached"
+            NotificationChannel(ALERT_CHANNEL_ID, tr("Period end"), NotificationManager.IMPORTANCE_HIGH).apply {
+                description = tr("Alerts when the planned period time is reached")
                 // The app vibrates with its own strong pattern.
                 enableVibration(false)
             }

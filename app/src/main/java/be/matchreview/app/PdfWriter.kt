@@ -1,5 +1,7 @@
 package be.matchreview.app
 
+import be.matchreview.app.i18n.tr
+
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
@@ -186,7 +188,7 @@ internal class PdfWriter(private val document: PdfDocument) {
         canvas = page!!.canvas
         y = PdfLayout.MARGIN
         canvas!!.drawText("MatchReview", PdfLayout.MARGIN, 24f, small)
-        canvas!!.drawText("Page $pageNumber", PdfLayout.PAGE_WIDTH - PdfLayout.MARGIN - 35f, 24f, small)
+        canvas!!.drawText(tr("Page {pageNumber}", "pageNumber" to pageNumber), PdfLayout.PAGE_WIDTH - PdfLayout.MARGIN - 35f, 24f, small)
     }
 
     private fun wrap(value: String, paint: Paint, width: Float): List<String> {

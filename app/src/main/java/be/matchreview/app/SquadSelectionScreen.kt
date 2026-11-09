@@ -1,5 +1,7 @@
 package be.matchreview.app
 
+import be.matchreview.app.i18n.tr
+
 import be.matchreview.app.ui.AppCard
 import be.matchreview.app.ui.AppButton
 import be.matchreview.app.ui.AppOutlinedButton
@@ -75,23 +77,23 @@ fun SquadSelectionScreen(
     val controls: @Composable () -> Unit = {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             SummaryPill("${summary.selectedCount}", "selected", Modifier.weight(1f))
-            SummaryPill("${roster.size}", "in team", Modifier.weight(1f))
-            SummaryPill("${current.playersOnPitch}", "on pitch", Modifier.weight(1f))
+            SummaryPill("${roster.size}", tr("in team"), Modifier.weight(1f))
+            SummaryPill("${current.playersOnPitch}", tr("on pitch"), Modifier.weight(1f))
         }
         OutlinedTextField(
             value = search,
             onValueChange = { search = it },
-            label = { Text("Search player, number or position") },
+            label = { Text(tr("Search player, number or position")) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth()
         )
         LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             val filters = listOf(
-                "ALL" to "All",
-                AvailabilityStatus.AVAILABLE.name to "Available",
-                AvailabilityStatus.INJURED.name to "Injured",
-                AvailabilityStatus.SUSPENDED.name to "Suspended",
-                AvailabilityStatus.UNAVAILABLE.name to "Unavailable"
+                "ALL" to tr("All"),
+                AvailabilityStatus.AVAILABLE.name to tr("Available"),
+                AvailabilityStatus.INJURED.name to tr("Injured"),
+                AvailabilityStatus.SUSPENDED.name to tr("Suspended"),
+                AvailabilityStatus.UNAVAILABLE.name to tr("Unavailable")
             )
             items(filters, key = { it.first }) { filter ->
                 FilterChip(
@@ -105,17 +107,17 @@ fun SquadSelectionScreen(
             AppTonalButton(
                 onClick = { vm.markAndSelectAllAvailable(matchId) },
                 modifier = Modifier.weight(1f)
-            ) { Text("Select all") }
+            ) { Text(tr("Select all")) }
             AppOutlinedButton(
                 onClick = { vm.clearSquadSelection(matchId) },
                 modifier = Modifier.weight(1f)
-            ) { Text("Clear selection") }
+            ) { Text(tr("Clear selection")) }
         }
     }
     val playerList: @Composable (Modifier) -> Unit = { modifier ->
         if (roster.isEmpty()) {
             Box(modifier, contentAlignment = Alignment.Center) {
-                Text("This team has no players. Add players to the team first.")
+                Text(tr("This team has no players. Add players to the team first."))
             }
         } else {
             LazyColumn(
@@ -143,7 +145,7 @@ fun SquadSelectionScreen(
                 if (visiblePlayers.isEmpty()) {
                     item {
                         Text(
-                            "No players match your search.",
+                            tr("No players match your search."),
                             modifier = Modifier.fillMaxWidth().padding(24.dp)
                         )
                     }
@@ -154,9 +156,9 @@ fun SquadSelectionScreen(
     val continueSection: @Composable () -> Unit = {
         // Only a warning; the count itself is in the summary at the top.
         when {
-            summary.selectedCount == 0 -> "Select at least one player."
+            summary.selectedCount == 0 -> tr("Select at least one player.")
             summary.selectedCount < current.playersOnPitch ->
-                "Select ${current.playersOnPitch - summary.selectedCount} more for a full ${current.playersOnPitch}v${current.playersOnPitch} lineup, or continue with fewer."
+                tr("Select {selectedCount} more for a full {playersOnPitch}v{playersOnPitch} lineup, or continue with fewer.", "selectedCount" to (current.playersOnPitch - summary.selectedCount), "playersOnPitch" to current.playersOnPitch)
             else -> null
         }?.let { warning ->
             Text(
@@ -171,7 +173,7 @@ fun SquadSelectionScreen(
             onClick = { nav.navigate("lineup/$matchId") },
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Continue to lineup")
+            Text(tr("Continue to lineup"))
         }
     }
 

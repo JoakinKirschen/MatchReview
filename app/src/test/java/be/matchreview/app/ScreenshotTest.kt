@@ -122,8 +122,9 @@ open class ScreenshotTest {
         }
     }
 
+    /** Clicks the English [text] in the language being shown. */
     private fun click(text: String) {
-        compose.onAllNodesWithText(text).onFirst().performClick()
+        compose.onAllNodesWithText(be.matchreview.app.i18n.tr(text)).onFirst().performClick()
         settle(40)
     }
 
@@ -186,7 +187,7 @@ open class ScreenshotTest {
         val ids = fixture()
         show("live/${ids.liveId}")
         // Tablets show the camera beside the pitch, without a camera tab.
-        val cameraTab = app.getString(R.string.camera_tab)
+        val cameraTab = "Camera"
         if (compose.onAllNodesWithText(cameraTab).fetchSemanticsNodes().isNotEmpty()) click(cameraTab)
         capture("10-live-camera")
     }
@@ -195,7 +196,7 @@ open class ScreenshotTest {
     fun liveTimeline() {
         val ids = fixture()
         show("live/${ids.liveId}")
-        click(app.getString(R.string.timeline_tab))
+        click("Timeline")
         capture("11-live-timeline")
     }
 
@@ -236,4 +237,18 @@ class LandscapeScreenshotTest : ScreenshotTest() {
 @Config(qualifiers = "w1280dp-h800dp-land-mdpi")
 class TabletScreenshotTest : ScreenshotTest() {
     override val namePrefix = "tablet-"
+}
+
+/** The main screens in Dutch. */
+@RunWith(AndroidJUnit4::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(qualifiers = "w360dp-h760dp-hdpi")
+class DutchScreenshotTest : ScreenshotTest() {
+    override val namePrefix = "nl-"
+
+    @Before
+    fun dutch() = be.matchreview.app.i18n.I18n.apply(be.matchreview.app.i18n.AppLanguage.DUTCH)
+
+    @org.junit.After
+    fun english() = be.matchreview.app.i18n.I18n.apply(be.matchreview.app.i18n.AppLanguage.ENGLISH)
 }

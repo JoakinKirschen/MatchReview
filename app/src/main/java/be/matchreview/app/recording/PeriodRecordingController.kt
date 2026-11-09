@@ -1,5 +1,7 @@
 package be.matchreview.app.recording
 
+import be.matchreview.app.i18n.tr
+
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
@@ -110,13 +112,13 @@ class PeriodRecordingController(private val context: Context) {
             CameraRecordingController.state.first { it !is CameraRecordingState.Finalizing }
         }
         when (state) {
-            null -> return fail("The camera was still saving the previous clip. Start recording again from the camera tab.")
+            null -> return fail(tr("The camera was still saving the previous clip. Start recording again from the camera tab."))
             // The coach already started recording during the break.
             is CameraRecordingState.Recording, is CameraRecordingState.Preparing -> return
             else -> Unit
         }
         if (!granted(Manifest.permission.CAMERA) || !RecordingPermissions.canSaveVideo(context)) {
-            return fail("Recording did not restart for the new period: camera or storage permission is missing.")
+            return fail(tr("Recording did not restart for the new period: camera or storage permission is missing."))
         }
         val available = runCatching {
             val path = context.getExternalFilesDir(Environment.DIRECTORY_MOVIES) ?: context.filesDir
@@ -124,7 +126,7 @@ class PeriodRecordingController(private val context: Context) {
         }.getOrDefault(0L)
         val budget = StorageBudgetRules.recordingBudget(available)
         if (!StorageHealthRules.evaluate(available).canStartRecording || !budget.canStart) {
-            return fail("Recording did not restart for the new period. ${budget.message}")
+            return fail(tr("Recording did not restart for the new period. {message}", "message" to budget.message))
         }
 
         val lens = if (resume.frontLens) CameraLens.FRONT else CameraLens.BACK
@@ -140,7 +142,7 @@ class PeriodRecordingController(private val context: Context) {
                     audioEnabled = resume.audioEnabled && granted(Manifest.permission.RECORD_AUDIO),
                     lens = lens
                 )
-            }.onFailure { fail("Recording did not restart for the new period: ${it.message ?: "camera unavailable"}") }
+            }.onFailure { fail(tr("Recording did not restart for the new period: {message}", "message" to (it.message ?: tr("camera unavailable")))) }
         }
     }
 

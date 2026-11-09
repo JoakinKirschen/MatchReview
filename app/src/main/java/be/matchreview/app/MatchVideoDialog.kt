@@ -1,5 +1,7 @@
 package be.matchreview.app
 
+import be.matchreview.app.i18n.tr
+
 import android.net.Uri
 import android.view.LayoutInflater
 import android.widget.FrameLayout
@@ -122,7 +124,7 @@ fun MatchVideoDialog(
                 Box(modifier.background(Color.Black)) {
                     if (clips.isEmpty()) {
                         Text(
-                            "No saved clips for this match yet.",
+                            tr("No saved clips for this match yet."),
                             modifier = Modifier.align(Alignment.Center).padding(24.dp)
                         )
                     } else {
@@ -167,7 +169,7 @@ fun MatchVideoDialog(
                         IconButton(
                             onClick = onDismiss,
                             colors = IconButtonDefaults.iconButtonColors(containerColor = Color(0x80000000))
-                        ) { Icon(Icons.Default.Close, contentDescription = "Close video", tint = Color.White) }
+                        ) { Icon(Icons.Default.Close, contentDescription = tr("Close video"), tint = Color.White) }
                         currentClip?.let { clip ->
                             Text(
                                 "${MatchVideoRules.clipLabel(clip, clips)} • " +
@@ -187,7 +189,7 @@ fun MatchVideoDialog(
                             ) {
                                 Icon(
                                     Icons.Default.ViewSidebar,
-                                    contentDescription = if (showList) "Hide periods and events" else "Show periods and events",
+                                    contentDescription = if (showList) tr("Hide periods and events") else tr("Show periods and events"),
                                     tint = Color.White
                                 )
                             }
@@ -201,13 +203,13 @@ fun MatchVideoDialog(
                             .padding(top = 60.dp, end = 6.dp),
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        OverlayAction("◀|", "One frame back") { stepFrame(forward = false) }
-                        OverlayAction("|▶", "One frame forward") { stepFrame(forward = true) }
-                        OverlayAction(VideoViewRules.speedLabel(speed), "Playback speed ${VideoViewRules.speedLabel(speed)}, tap to change") {
+                        OverlayAction("◀|", tr("One frame back")) { stepFrame(forward = false) }
+                        OverlayAction("|▶", tr("One frame forward")) { stepFrame(forward = true) }
+                        OverlayAction(VideoViewRules.speedLabel(speed), tr("Playback speed {speed}, tap to change", "speed" to (VideoViewRules.speedLabel(speed)))) {
                             speed = VideoViewRules.nextSpeed(speed)
                         }
                         if (zoom > 1f) {
-                            OverlayAction("${"%.1f".format(zoom)}×", "Zoomed in, tap to zoom out") {
+                            OverlayAction("${"%.1f".format(zoom)}×", tr("Zoomed in, tap to zoom out")) {
                                 zoom = 1f; panX = 0f; panY = 0f
                             }
                         }
@@ -263,7 +265,7 @@ private fun MatchVideoChapters(
             item {
                 Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Text(
-                    "${clips.size} clip(s) • ${MatchClockCalculator.formatClock(MatchVideoRules.totalDurationMs(clips))} of video",
+                    tr("{clipsCount} clip(s) • {time} of video", "clipsCount" to clips.size, "time" to (MatchClockCalculator.formatClock(MatchVideoRules.totalDurationMs(clips)))),
                     style = MaterialTheme.typography.bodySmall
                 )
             }
@@ -276,7 +278,7 @@ private fun MatchVideoChapters(
                     supportingContent = {
                         val segment = clip.segment
                         Text(
-                            "Match ${MatchClockCalculator.formatClock(segment.matchClockStartMs)}–" +
+                            tr("Match {time}–", "time" to (MatchClockCalculator.formatClock(segment.matchClockStartMs))) +
                                 MatchClockCalculator.formatClock(
                                     segment.matchClockEndMs ?: (segment.matchClockStartMs + segment.recordingDurationMs)
                                 ) + " • ${MatchClockCalculator.formatClock(segment.recordingDurationMs)}"
@@ -293,7 +295,7 @@ private fun MatchVideoChapters(
             if (chapterEvents.isNotEmpty()) {
                 item {
                     Text(
-                        "Events",
+                        tr("Events"),
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(top = 8.dp)

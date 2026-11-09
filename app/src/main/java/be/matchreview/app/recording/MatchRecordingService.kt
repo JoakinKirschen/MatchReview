@@ -1,5 +1,7 @@
 package be.matchreview.app.recording
 
+import be.matchreview.app.i18n.tr
+
 import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -88,7 +90,7 @@ class MatchRecordingService : LifecycleService() {
             stoppingByUser = false
             active.stop()
         } else {
-            abandonPreparingSegment("Recording stopped before it started")
+            abandonPreparingSegment(tr("Recording stopped before it started"))
         }
         cameraProvider?.unbindAll()
         super.onDestroy()
@@ -116,7 +118,7 @@ class MatchRecordingService : LifecycleService() {
             CameraRecordingController.state.value is CameraRecordingState.Preparing
         if (busy) {
             // startForegroundService() was called again; confirm the running foreground state.
-            enterForeground("Recording match video", audioEnabled)
+            enterForeground(tr("Recording match video"), audioEnabled)
             return
         }
         audioEnabled = intent.getBooleanExtra(EXTRA_AUDIO_ENABLED, false) &&
@@ -125,16 +127,16 @@ class MatchRecordingService : LifecycleService() {
         // startForeground() must follow startForegroundService() even when the start
         // is refused below, otherwise Android crashes the app.
         val foreground = hasPermission(Manifest.permission.CAMERA) &&
-            enterForeground("Preparing camera…", audioEnabled)
+            enterForeground(tr("Preparing camera…"), audioEnabled)
         if (!foreground) {
             refuseStart(
-                if (hasPermission(Manifest.permission.CAMERA)) "Unable to start the camera service"
-                else "Camera permission is required"
+                if (hasPermission(Manifest.permission.CAMERA)) tr("Unable to start the camera service")
+                else tr("Camera permission is required")
             )
             return
         }
         if (!RecordingPermissions.canSaveVideo(this)) {
-            refuseStart("Storage permission is required to save the video")
+            refuseStart(tr("Storage permission is required to save the video"))
             return
         }
 
@@ -145,7 +147,7 @@ class MatchRecordingService : LifecycleService() {
             StorageHealthRules.evaluate(StatFs(movies.absolutePath).availableBytes)
         }.getOrElse { StorageHealthRules.evaluate(0L) }
         if (!storage.canStartRecording) {
-            refuseStart("Not enough free storage (${StorageHealthRules.formatAvailable(storage.availableBytes)})")
+            refuseStart(tr("Not enough free storage ({availableBytes})", "availableBytes" to (StorageHealthRules.formatAvailable(storage.availableBytes))))
             return
         }
 
@@ -162,7 +164,7 @@ class MatchRecordingService : LifecycleService() {
         val segmentOrientation = orientationDegrees
         val segmentAudio = audioEnabled
         app.applicationScope.launch {
-            repository.markOpenRecordingsInterrupted("Recording was interrupted before finalization")
+            repository.markOpenRecordingsInterrupted(tr("Recording was interrupted before finalization"))
             val id = repository.beginRecordingSegment(
                 matchId = segmentMatchId,
                 matchClockStartMs = startClock,
@@ -171,7 +173,7 @@ class MatchRecordingService : LifecycleService() {
             )
             withContext(Dispatchers.Main) {
                 if (destroyed || cancelledBeforeStart) {
-                    failSegment(id, startClock, "Recording cancelled before it started")
+                    failSegment(id, startClock, tr("Recording cancelled before it started"))
                 } else {
                     segmentId = id
                     bindCamera()
@@ -212,12 +214,12 @@ class MatchRecordingService : LifecycleService() {
                     preview?.setSurfaceProvider(surfaceProvider)
                 }
                 startCameraXRecording(videoCapture)
-            }.onFailure { failCurrent("Unable to open camera: ${it.message}") }
+            }.onFailure { failCurrent(tr("Unable to open camera: {message}", "message" to it.message)) }
         }, ContextCompat.getMainExecutor(this))
     }
 
     private fun startCameraXRecording(videoCapture: VideoCapture<Recorder>) {
-        val id = segmentId ?: return failCurrent("Recording segment was not created")
+        val id = segmentId ?: return failCurrent(tr("Recording segment was not created"))
         val fileName = "MatchReview_" + SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
         val values = ContentValues().apply {
             put(MediaStore.Video.Media.DISPLAY_NAME, fileName)
@@ -255,7 +257,7 @@ class MatchRecordingService : LifecycleService() {
                     CameraRecordingController.updateState(
                         CameraRecordingState.Recording(id, recordingMatchId, startedAtElapsedRealtimeMs, audioEnabled)
                     )
-                    updateNotification("Recording match video")
+                    updateNotification(tr("Recording match video"))
                 }
                 is VideoRecordEvent.Finalize -> finalizeRecording(id, recordingMatchId, event)
             }
@@ -270,7 +272,7 @@ class MatchRecordingService : LifecycleService() {
                 is CameraRecordingState.Finalizing -> return
                 is CameraRecordingState.Preparing -> {
                     cancelledBeforeStart = true
-                    abandonPreparingSegment("Recording cancelled before it started")
+                    abandonPreparingSegment(tr("Recording cancelled before it started"))
                 }
                 else -> Unit
             }
@@ -281,7 +283,7 @@ class MatchRecordingService : LifecycleService() {
         val id = segmentId ?: return
         stoppingByUser = true
         CameraRecordingController.updateState(CameraRecordingState.Finalizing(id, matchId))
-        updateNotification("Saving video…")
+        updateNotification(tr("Saving video…"))
         active.stop()
     }
 
@@ -329,7 +331,7 @@ class MatchRecordingService : LifecycleService() {
                         status = failedStatus,
                         matchClockEndMs = endClock,
                         recordingDurationMs = durationMs,
-                        errorMessage = error ?: "Recording failed",
+                        errorMessage = error ?: tr("Recording failed"),
                         uri = uri
                     )
                 }
@@ -339,7 +341,7 @@ class MatchRecordingService : LifecycleService() {
                     when {
                         error == null -> CameraRecordingState.Idle
                         keepFile -> CameraRecordingState.Error(
-                            "Recording stopped ($error). The clip was saved; start recording again to continue."
+                            tr("Recording stopped ({error}). The clip was saved; start recording again to continue.", "error" to error)
                         )
                         else -> CameraRecordingState.Error(error)
                     }
@@ -354,10 +356,10 @@ class MatchRecordingService : LifecycleService() {
 
     private fun finalizeErrorMessage(event: VideoRecordEvent.Finalize): String =
         when (event.error) {
-            VideoRecordEvent.Finalize.ERROR_FILE_SIZE_LIMIT_REACHED -> "File-size limit reached"
-            VideoRecordEvent.Finalize.ERROR_INSUFFICIENT_STORAGE -> "Insufficient storage"
-            VideoRecordEvent.Finalize.ERROR_SOURCE_INACTIVE -> "Camera source became inactive"
-            else -> event.cause?.message ?: "CameraX finalize error ${event.error}"
+            VideoRecordEvent.Finalize.ERROR_FILE_SIZE_LIMIT_REACHED -> tr("File-size limit reached")
+            VideoRecordEvent.Finalize.ERROR_INSUFFICIENT_STORAGE -> tr("Insufficient storage")
+            VideoRecordEvent.Finalize.ERROR_SOURCE_INACTIVE -> tr("Camera source became inactive")
+            else -> event.cause?.message ?: tr("CameraX finalize error {error}", "error" to event.error)
         }
 
     private fun failCurrent(message: String) {
@@ -426,11 +428,11 @@ class MatchRecordingService : LifecycleService() {
         )
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.presence_video_online)
-            .setContentTitle("MatchReview camera")
+            .setContentTitle(tr("MatchReview camera"))
             .setContentText(text)
             .setOngoing(true)
             .setContentIntent(open)
-            .addAction(android.R.drawable.ic_media_pause, "Stop and save", stop)
+            .addAction(android.R.drawable.ic_media_pause, tr("Stop and save"), stop)
             .build()
     }
 
@@ -439,9 +441,9 @@ class MatchRecordingService : LifecycleService() {
             getSystemService(NotificationManager::class.java).createNotificationChannel(
                 NotificationChannel(
                     CHANNEL_ID,
-                    "Match recording",
+                    tr("Match recording"),
                     NotificationManager.IMPORTANCE_LOW
-                ).apply { description = "Keeps match video recording active" }
+                ).apply { description = tr("Keeps match video recording active") }
             )
         }
     }

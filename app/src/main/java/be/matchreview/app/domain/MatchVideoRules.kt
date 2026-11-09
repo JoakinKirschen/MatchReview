@@ -1,5 +1,7 @@
 package be.matchreview.app.domain
 
+import be.matchreview.app.i18n.tr
+
 import be.matchreview.app.data.MatchEvent
 import be.matchreview.app.data.MatchPeriod
 import be.matchreview.app.data.RecordingSegment
@@ -70,9 +72,9 @@ object MatchVideoRules {
     }
 
     fun clipLabel(clip: MatchVideoClip, clips: List<MatchVideoClip>): String {
-        val period = clip.periodNumber ?: return "Clip ${clip.index + 1}"
+        val period = clip.periodNumber ?: return tr("Clip {index}", "index" to (clip.index + 1))
         val inPeriod = clips.filter { it.periodNumber == period }
-        return if (inPeriod.size <= 1) "Period $period"
-        else "Period $period • part ${inPeriod.indexOf(clip) + 1}"
+        return if (inPeriod.size <= 1) tr("Period {period}", "period" to period)
+        else tr("Period {period} • part {clip}", "period" to period, "clip" to (inPeriod.indexOf(clip) + 1))
     }
 }

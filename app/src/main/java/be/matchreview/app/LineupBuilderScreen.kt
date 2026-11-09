@@ -1,5 +1,7 @@
 package be.matchreview.app
 
+import be.matchreview.app.i18n.tr
+
 import be.matchreview.app.ui.AppButton
 import be.matchreview.app.ui.AppOutlinedButton
 import be.matchreview.app.ui.AppTonalButton
@@ -220,7 +222,7 @@ fun LineupBuilderScreen(
             onDragEnd = ::finishDrag,
             onDragCancel = { dragState = null },
             highlightedPlayerId = swapTargetId,
-            dropHint = swapTargetId?.let { "Swap with ${playersById[it]?.name ?: "player"}" },
+            dropHint = swapTargetId?.let { tr("Swap with {it}", "it" to (playersById[it]?.name ?: "player")) },
             horizontal = landscape,
             modifier = modifier.padding(horizontal = 4.dp, vertical = 2.dp)
         )
@@ -247,7 +249,7 @@ fun LineupBuilderScreen(
     }
     val summary: @Composable () -> Unit = {
         Text(
-            "${onPitch.size}/${current.playersOnPitch} on pitch  •  vs ${current.opponent}  •  ${current.formation}",
+            tr("{onPitchCount}/{playersOnPitch} on pitch  •  vs {opponent}  •  {formation}", "onPitchCount" to onPitch.size, "playersOnPitch" to current.playersOnPitch, "opponent" to current.opponent, "formation" to current.formation),
             color = if (onPitch.size == current.playersOnPitch) {
                 MaterialTheme.colorScheme.primary
             } else {
@@ -266,14 +268,14 @@ fun LineupBuilderScreen(
             onClick = { showAutoPlaceConfirmation = true },
             enabled = selectedPlayers.isNotEmpty() && dragState == null,
             modifier = modifier
-        ) { Text("Auto-place", maxLines = 1) }
+        ) { Text(tr("Auto-place"), maxLines = 1) }
     }
     val squadButton: @Composable (Modifier) -> Unit = { modifier ->
         AppOutlinedButton(
             onClick = { nav.navigate("squad/$matchId") },
             enabled = dragState == null,
             modifier = modifier
-        ) { Text("Squad", maxLines = 1) }
+        ) { Text(tr("Squad"), maxLines = 1) }
     }
     val matchDayButton: @Composable (Modifier) -> Unit = { modifier ->
         AppButton(
@@ -290,7 +292,7 @@ fun LineupBuilderScreen(
                 }
             },
             modifier = modifier
-        ) { Text("Match day", maxLines = 1) }
+        ) { Text(tr("Match day"), maxLines = 1) }
     }
 
     Box(
@@ -404,13 +406,13 @@ fun LineupBuilderScreen(
     if (showAutoPlaceConfirmation) {
         AlertDialog(
             onDismissRequest = { showAutoPlaceConfirmation = false },
-            title = { Text("Auto-place lineup?") },
+            title = { Text(tr("Auto-place lineup?")) },
             text = {
                 Text(
                     if (onPitch.isEmpty()) {
-                        "Players will be placed into the available ${current.formation} formation slots."
+                        tr("Players will be placed into the available {formation} formation slots.", "formation" to current.formation)
                     } else {
-                        "This will replace the current manual placement with an automatic ${current.formation} lineup."
+                        tr("This will replace the current manual placement with an automatic {formation} lineup.", "formation" to current.formation)
                     }
                 )
             },
@@ -420,10 +422,10 @@ fun LineupBuilderScreen(
                         showAutoPlaceConfirmation = false
                         vm.autoPlaceLineup(matchId, selectedPlayers, slots)
                     }
-                ) { Text("Auto-place") }
+                ) { Text(tr("Auto-place")) }
             },
             dismissButton = {
-                TextButton(onClick = { showAutoPlaceConfirmation = false }) { Text("Cancel") }
+                TextButton(onClick = { showAutoPlaceConfirmation = false }) { Text(tr("Cancel")) }
             }
         )
     }
@@ -431,10 +433,10 @@ fun LineupBuilderScreen(
     if (showUnderfilledConfirmation) {
         AlertDialog(
             onDismissRequest = { showUnderfilledConfirmation = false },
-            title = { Text("Save a smaller starting lineup?") },
+            title = { Text(tr("Save a smaller starting lineup?")) },
             text = {
                 Text(
-                    "The match is configured for ${current.playersOnPitch} players, but ${onPitch.size} are currently on the pitch."
+                    tr("The match is configured for {playersOnPitch} players, but {onPitchCount} are currently on the pitch.", "playersOnPitch" to current.playersOnPitch, "onPitchCount" to onPitch.size)
                 )
             },
             confirmButton = {
@@ -445,11 +447,11 @@ fun LineupBuilderScreen(
                             popUpTo("lineup/$matchId") { inclusive = true }
                         }
                     }
-                }) { Text("Save anyway") }
+                }) { Text(tr("Save anyway")) }
             },
             dismissButton = {
                 TextButton(onClick = { showUnderfilledConfirmation = false }) {
-                    Text("Keep editing")
+                    Text(tr("Keep editing"))
                 }
             }
         )
@@ -553,7 +555,7 @@ internal fun PitchView(
 
         if (isDropTarget) {
             Text(
-                dropHint ?: if (highlightedSlotId != null) "Release to snap into position" else "Release to place on pitch",
+                dropHint ?: if (highlightedSlotId != null) tr("Release to snap into position") else tr("Release to place on pitch"),
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .padding(8.dp)
@@ -670,12 +672,12 @@ private fun PlayerMarker(
             )
             .semantics {
                 contentDescription =
-                    "${player.name}, number ${player.shirtNumber}, ${role.ifBlank { "on pitch" }}. Drag to move."
+                    tr("{playerName}, number {shirtNumber}, {pitch}. Drag to move.", "playerName" to player.name, "shirtNumber" to player.shirtNumber, "pitch" to (role.ifBlank { tr("on pitch") }))
                 customActions = listOf(
-                    CustomAccessibilityAction("Move left") { onNudge(-0.05f, 0f); true },
-                    CustomAccessibilityAction("Move right") { onNudge(0.05f, 0f); true },
-                    CustomAccessibilityAction("Move forward") { onNudge(0f, -0.05f); true },
-                    CustomAccessibilityAction("Move back") { onNudge(0f, 0.05f); true }
+                    CustomAccessibilityAction(tr("Move left")) { onNudge(-0.05f, 0f); true },
+                    CustomAccessibilityAction(tr("Move right")) { onNudge(0.05f, 0f); true },
+                    CustomAccessibilityAction(tr("Move forward")) { onNudge(0f, -0.05f); true },
+                    CustomAccessibilityAction(tr("Move back")) { onNudge(0f, 0.05f); true }
                 )
             }
             .clickable(onClick = onClick),
@@ -774,14 +776,14 @@ internal fun BenchPanel(
     ) {
         Column(Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
             Text(
-                if (isDropTarget) "RELEASE TO MOVE TO BENCH" else "BENCH • ${players.size}",
+                if (isDropTarget) tr("RELEASE TO MOVE TO BENCH") else tr("BENCH • {playersCount}", "playersCount" to players.size),
                 modifier = Modifier.padding(horizontal = 8.dp),
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.Bold
             )
             if (players.isEmpty()) {
                 Text(
-                    if (draggingPlayerId != null) "Drop the player here." else "All selected players are on the pitch.",
+                    if (draggingPlayerId != null) tr("Drop the player here.") else tr("All selected players are on the pitch."),
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                     style = MaterialTheme.typography.bodySmall
                 )
@@ -856,9 +858,9 @@ private fun BenchPlayer(
             )
             .semantics {
                 contentDescription =
-                    "${player.name}, substitute. Tap for placement options or drag onto the pitch."
+                    tr("{playerName}, substitute. Tap for placement options or drag onto the pitch.", "playerName" to player.name)
                 customActions = listOf(
-                    CustomAccessibilityAction("Open placement options") {
+                    CustomAccessibilityAction(tr("Open placement options")) {
                         onPlayerClick(player.id)
                         true
                     }
@@ -1002,24 +1004,24 @@ private fun PlayerPlacementSheet(
                     onClick = { onMoveToPitch(nearestAvailable) },
                     enabled = !pitchFull,
                     modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
-                ) { Text(if (pitchFull) "Pitch is full" else "Place in next free formation slot") }
+                ) { Text(if (pitchFull) tr("Pitch is full") else tr("Place in next free formation slot")) }
             } else {
-                Text("Fine position", style = MaterialTheme.typography.titleMedium)
+                Text(tr("Fine position"), style = MaterialTheme.typography.titleMedium)
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-                    AppTonalButton(onClick = { onNudge(0f, -0.05f) }) { Text("↑ Forward") }
+                    AppTonalButton(onClick = { onNudge(0f, -0.05f) }) { Text(tr("↑ Forward")) }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        AppTonalButton(onClick = { onNudge(-0.05f, 0f) }) { Text("← Left") }
-                        AppTonalButton(onClick = { onNudge(0.05f, 0f) }) { Text("Right →") }
+                        AppTonalButton(onClick = { onNudge(-0.05f, 0f) }) { Text(tr("← Left")) }
+                        AppTonalButton(onClick = { onNudge(0.05f, 0f) }) { Text(tr("Right →")) }
                     }
-                    AppTonalButton(onClick = { onNudge(0f, 0.05f) }) { Text("↓ Back") }
+                    AppTonalButton(onClick = { onNudge(0f, 0.05f) }) { Text(tr("↓ Back")) }
                 }
                 AppOutlinedButton(onClick = onMoveToBench, modifier = Modifier.fillMaxWidth()) {
-                    Text("Move to bench")
+                    Text(tr("Move to bench"))
                 }
             }
 
             if (occupiedPlacements.isNotEmpty()) {
-                Text("Swap with a player", style = MaterialTheme.typography.titleMedium)
+                Text(tr("Swap with a player"), style = MaterialTheme.typography.titleMedium)
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(occupiedPlacements, key = { it.playerId }) { occupied ->
                         val other = playersById[occupied.playerId]
@@ -1030,7 +1032,7 @@ private fun PlayerPlacementSheet(
                                     listOfNotNull(
                                         other?.shirtNumber?.takeIf { it > 0 }?.let { "#$it" },
                                         other?.name
-                                    ).joinToString(" ").ifBlank { "Player" }
+                                    ).joinToString(" ").ifBlank { tr("Player") }
                                 )
                             },
                             modifier = Modifier.heightIn(min = 48.dp)
@@ -1039,9 +1041,9 @@ private fun PlayerPlacementSheet(
                 }
             }
 
-            Text("Choose a formation slot", style = MaterialTheme.typography.titleMedium)
+            Text(tr("Choose a formation slot"), style = MaterialTheme.typography.titleMedium)
             Text(
-                "Tap a free slot below. Long-press dragging remains available on the lineup screen.",
+                tr("Tap a free slot below. Long-press dragging remains available on the lineup screen."),
                 style = MaterialTheme.typography.bodySmall
             )
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

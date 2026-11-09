@@ -1,5 +1,7 @@
 package be.matchreview.app
 
+import be.matchreview.app.i18n.tr
+
 import be.matchreview.app.ui.AppCard
 import android.widget.Toast
 import androidx.compose.foundation.layout.*
@@ -40,7 +42,7 @@ internal fun formatTime(milliseconds: Long): String {
 internal fun showClipsRemainingToast(context: android.content.Context, remaining: Int) {
     Toast.makeText(
         context,
-        "$remaining recorded clip(s) could not be deleted. Remove them from Movies/MatchReview in your gallery.",
+        tr("{remaining} recorded clip(s) could not be deleted. Remove them from Movies/MatchReview in your gallery.", "remaining" to remaining),
         Toast.LENGTH_LONG
     ).show()
 }

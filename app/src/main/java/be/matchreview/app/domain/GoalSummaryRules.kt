@@ -1,5 +1,7 @@
 package be.matchreview.app.domain
 
+import be.matchreview.app.i18n.tr
+
 import be.matchreview.app.data.MatchEvent
 
 /** One line per goal, in match order, such as "12' Sam (assist Lee)". */
@@ -25,7 +27,7 @@ object GoalSummaryRules {
                 val assist = goal.relatedPlayerId
                     ?.takeIf { goal.type == "OUR_GOAL" }
                     ?.let(playerNames::get)
-                    ?.let { " (assist $it)" }
+                    ?.let { tr(" (assist {value})", "value" to it) }
                     .orEmpty()
                 "${minute(goal.timestampMs)}' $scorer$assist"
             }

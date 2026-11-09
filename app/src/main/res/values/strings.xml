@@ -1,16 +1,3 @@
 <resources>
     <string name="app_name">MatchReview</string>
-    <string name="nav_home">Home</string>
-    <string name="nav_teams">Teams</string>
-    <string name="nav_matches">Matches</string>
-    <string name="navigate_back">Back</string>
-    <string name="our_goal">Our goal</string>
-    <string name="opponent_goal">Opponent goal</string>
-    <string name="their_goal">Their goal</string>
-    <string name="undo">Undo</string>
-    <string name="keeper_save">Save</string>
-    <string name="substitute">Substitute</string>
-    <string name="match_tab">Match</string>
-    <string name="camera_tab">Camera</string>
-    <string name="timeline_tab">Timeline</string>
 </resources>

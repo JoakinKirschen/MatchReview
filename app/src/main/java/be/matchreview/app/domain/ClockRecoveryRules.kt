@@ -1,5 +1,7 @@
 package be.matchreview.app.domain
 
+import be.matchreview.app.i18n.tr
+
 enum class ClockRecoveryConfidence { SAME_BOOT, REBOOT_RECOVERED, NEEDS_CONFIRMATION }
 
 data class ClockRecoveryAssessment(
@@ -28,9 +30,9 @@ object ClockRecoveryRules {
         val suspicious = wallElapsed < 0 ||
             (monotonicElapsed >= 0 && kotlin.math.abs(wallElapsed - monotonicElapsed) > WALL_CLOCK_DRIFT_WARNING_MS)
         return when {
-            suspicious -> ClockRecoveryAssessment(recovered, ClockRecoveryConfidence.NEEDS_CONFIRMATION, "Device time changed while the match clock was active.")
-            rebooted -> ClockRecoveryAssessment(recovered, ClockRecoveryConfidence.REBOOT_RECOVERED, "Clock recovered from its saved wall-clock checkpoint.")
-            else -> ClockRecoveryAssessment(recovered, ClockRecoveryConfidence.SAME_BOOT, "Clock recovered from monotonic elapsed time.")
+            suspicious -> ClockRecoveryAssessment(recovered, ClockRecoveryConfidence.NEEDS_CONFIRMATION, tr("Device time changed while the match clock was active."))
+            rebooted -> ClockRecoveryAssessment(recovered, ClockRecoveryConfidence.REBOOT_RECOVERED, tr("Clock recovered from its saved wall-clock checkpoint."))
+            else -> ClockRecoveryAssessment(recovered, ClockRecoveryConfidence.SAME_BOOT, tr("Clock recovered from monotonic elapsed time."))
         }
     }
 }

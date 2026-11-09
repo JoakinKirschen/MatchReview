@@ -1,5 +1,7 @@
 package be.matchreview.app.backup
 
+import be.matchreview.app.i18n.tr
+
 import android.content.ContentValues
 import android.content.Context
 import android.database.Cursor
@@ -104,10 +106,10 @@ class MatchBackupManager(
                                     put("archivePath", archivePath)
                                 })
                                 mediaCount++
-                            } ?: warnings.add("Could not open media: $originalUri")
+                            } ?: warnings.add(tr("Could not open media: {originalUri}", "originalUri" to originalUri))
                         } catch (error: Exception) {
                             runCatching { zip.closeEntry() }
-                            warnings.add("Skipped unavailable media: $originalUri")
+                            warnings.add(tr("Skipped unavailable media: {originalUri}", "originalUri" to originalUri))
                         }
                     }
                 }
@@ -116,7 +118,7 @@ class MatchBackupManager(
 
             context.contentResolver.openOutputStream(destination, "w")?.use { output ->
                 BackupCrypto.encrypt(tempZip, output, password)
-            } ?: throw BackupException("The selected backup destination could not be opened.")
+            } ?: throw BackupException(tr("The selected backup destination could not be opened."))
 
             counts(databaseJson, mediaCount, warnings)
         } finally {
@@ -134,7 +136,7 @@ class MatchBackupManager(
         try {
             context.contentResolver.openInputStream(source)?.use { input ->
                 BackupCrypto.decrypt(input, tempZip, password)
-            } ?: throw BackupException("The selected backup could not be opened.")
+            } ?: throw BackupException(tr("The selected backup could not be opened."))
 
             ZipFile(tempZip).use { zip ->
                 val metadata = zip.readJsonObject(METADATA_ENTRY)
@@ -151,8 +153,8 @@ class MatchBackupManager(
                     emptyList()
                 )
                 BackupPreview(
-                    createdAtUtc = metadata.optString("createdAtUtc", "Unknown"),
-                    appVersionName = metadata.optString("appVersionName", "Unknown"),
+                    createdAtUtc = metadata.optString("createdAtUtc", tr("Unknown")),
+                    appVersionName = metadata.optString("appVersionName", tr("Unknown")),
                     appVersionCode = metadata.optInt("appVersionCode", -1),
                     databaseVersion = metadata.optInt("databaseVersion", -1),
                     backupFormatVersion = metadata.optInt("backupFormatVersion", -1),
@@ -168,8 +170,8 @@ class MatchBackupManager(
         } catch (error: Exception) {
             val message = when {
                 error.causeChainContains("AEADBadTagException") ->
-                    "The password is incorrect or the backup has been damaged."
-                else -> "Backup inspection failed: ${error.message ?: "invalid backup"}"
+                    tr("The password is incorrect or the backup has been damaged.")
+                else -> tr("Backup inspection failed: {message}", "message" to (error.message ?: tr("invalid backup")))
             }
             throw BackupException(message, error)
         } finally {
@@ -189,7 +191,7 @@ class MatchBackupManager(
         try {
             context.contentResolver.openInputStream(source)?.use { input ->
                 BackupCrypto.decrypt(input, tempZip, password)
-            } ?: throw BackupException("The selected backup could not be opened.")
+            } ?: throw BackupException(tr("The selected backup could not be opened."))
 
             ZipFile(tempZip).use { zip ->
                 val metadata = zip.readJsonObject(METADATA_ENTRY)
@@ -216,8 +218,8 @@ class MatchBackupManager(
             restoredMediaDir.deleteRecursively()
             val message = when {
                 error.causeChainContains("AEADBadTagException") ->
-                    "The password is incorrect or the backup has been damaged."
-                else -> "Restore failed: ${error.message ?: "invalid backup"}"
+                    tr("The password is incorrect or the backup has been damaged.")
+                else -> tr("Restore failed: {message}", "message" to (error.message ?: tr("invalid backup")))
             }
             throw BackupException(message, error)
         } finally {
@@ -249,7 +251,7 @@ class MatchBackupManager(
                 Cursor.FIELD_TYPE_INTEGER -> cursor.getLong(index)
                 Cursor.FIELD_TYPE_FLOAT -> cursor.getDouble(index)
                 Cursor.FIELD_TYPE_STRING -> cursor.getString(index)
-                Cursor.FIELD_TYPE_BLOB -> throw BackupException("Binary database columns are not supported.")
+                Cursor.FIELD_TYPE_BLOB -> throw BackupException(tr("Binary database columns are not supported."))
                 else -> JSONObject.NULL
             }
             put(cursor.getColumnName(index), value)
@@ -274,11 +276,11 @@ class MatchBackupManager(
                         is Long -> values.put(column, value)
                         is Double -> values.put(column, value)
                         is String -> values.put(column, value)
-                        else -> throw BackupException("Unsupported value in $table.$column")
+                        else -> throw BackupException(tr("Unsupported value in {table}.{column}", "table" to table, "column" to column))
                     }
                 }
                 val inserted = sqlite.insert(table, 0, values)
-                if (inserted == -1L) throw BackupException("Could not restore table $table.")
+                if (inserted == -1L) throw BackupException(tr("Could not restore table {table}.", "table" to table))
             }
         }
     }
@@ -286,26 +288,26 @@ class MatchBackupManager(
     private fun validateMetadata(metadata: JSONObject) {
         val format = metadata.optInt("backupFormatVersion", -1)
         if (format !in MIN_SUPPORTED_BACKUP_FORMAT_VERSION..BACKUP_FORMAT_VERSION) {
-            throw BackupException("Unsupported backup format version: $format.")
+            throw BackupException(tr("Unsupported backup format version: {format}.", "format" to format))
         }
         val databaseVersion = metadata.optInt("databaseVersion", -1)
         if (databaseVersion < 1 || databaseVersion > AppDatabase.DATABASE_VERSION) {
             throw BackupException(
-                "This backup uses database version $databaseVersion; this app supports up to ${AppDatabase.DATABASE_VERSION}."
+                tr("This backup uses database version {databaseVersion}; this app supports up to {supported}.", "databaseVersion" to databaseVersion, "supported" to AppDatabase.DATABASE_VERSION)
             )
         }
     }
 
     private fun validateDatabaseJson(databaseJson: JSONObject) {
         val tables = databaseJson.optJSONObject("tables")
-            ?: throw BackupException("The backup has no database tables.")
+            ?: throw BackupException(tr("The backup has no database tables."))
         TABLES_IN_INSERT_ORDER.forEach { table ->
             if (!tables.has(table) || tables.optJSONArray(table) == null) {
-                throw BackupException("The backup is missing table: $table.")
+                throw BackupException(tr("The backup is missing table: {table}.", "table" to table))
             }
         }
         val unknown = tables.keys().asSequence().filterNot { it in TABLES_IN_INSERT_ORDER }.toList()
-        if (unknown.isNotEmpty()) throw BackupException("The backup contains unsupported tables.")
+        if (unknown.isNotEmpty()) throw BackupException(tr("The backup contains unsupported tables."))
     }
 
     private fun verifyDatabaseDigest(metadata: JSONObject, databaseText: String) {
@@ -313,7 +315,7 @@ class MatchBackupManager(
         if (format < 2) return // Legacy format 1 relied on the authenticated encryption envelope.
         val expected = metadata.optString("databaseSha256")
         if (expected.isBlank() || !expected.equals(sha256(databaseText), ignoreCase = true)) {
-            throw BackupException("The backup database failed its integrity check.")
+            throw BackupException(tr("The backup database failed its integrity check."))
         }
     }
 
@@ -328,14 +330,14 @@ class MatchBackupManager(
             "SELECT COUNT(*) FROM matches WHERE status IN ('LIVE','PAUSED','PERIOD_ENDED')"
         ).use {
             if (it.moveToFirst() && it.getLong(0) > 0) {
-                throw BackupException("Finish or abandon the active match before restoring a backup.")
+                throw BackupException(tr("Finish or abandon the active match before restoring a backup."))
             }
         }
         sqlite.query(
             "SELECT COUNT(*) FROM recording_segments WHERE status IN ('PREPARING','RECORDING')"
         ).use {
             if (it.moveToFirst() && it.getLong(0) > 0) {
-                throw BackupException("Stop the active recording before restoring a backup.")
+                throw BackupException(tr("Stop the active recording before restoring a backup."))
             }
         }
     }
@@ -369,10 +371,10 @@ class MatchBackupManager(
             val original = item.getString("originalUri")
             val archivePath = item.getString("archivePath")
             if (!archivePath.startsWith("media/") || ".." in archivePath) {
-                throw BackupException("Unsafe media path in backup.")
+                throw BackupException(tr("Unsafe media path in backup."))
             }
             val entry = zip.getEntry(archivePath)
-                ?: throw BackupException("A media file listed in the backup is missing.")
+                ?: throw BackupException(tr("A media file listed in the backup is missing."))
             val target = File(outputDir, "${index.toString().padStart(5, '0')}.bin")
             zip.getInputStream(entry).use { input ->
                 FileOutputStream(target).use { output -> input.copyTo(output) }
@@ -417,7 +419,7 @@ class MatchBackupManager(
 
     private fun validatePassword(password: CharArray) {
         if (password.size < MIN_PASSWORD_LENGTH) {
-            throw BackupException("Use a backup password of at least $MIN_PASSWORD_LENGTH characters.")
+            throw BackupException(tr("Use a backup password of at least {length} characters.", "length" to MIN_PASSWORD_LENGTH))
         }
     }
 
@@ -475,12 +477,12 @@ internal object BackupCrypto {
         val data = DataInputStream(BufferedInputStream(input))
         val magic = ByteArray(MAGIC.size)
         data.readFully(magic)
-        if (!magic.contentEquals(MAGIC)) throw BackupException("This is not a MatchReview backup.")
+        if (!magic.contentEquals(MAGIC)) throw BackupException(tr("This is not a MatchReview backup."))
         val version = data.readInt()
-        if (version != ENVELOPE_VERSION) throw BackupException("Unsupported encrypted backup version.")
+        if (version != ENVELOPE_VERSION) throw BackupException(tr("Unsupported encrypted backup version."))
         val saltSize = data.readInt()
         val ivSize = data.readInt()
-        if (saltSize !in 8..64 || ivSize !in 12..32) throw BackupException("Invalid backup header.")
+        if (saltSize !in 8..64 || ivSize !in 12..32) throw BackupException(tr("Invalid backup header."))
         val salt = ByteArray(saltSize).also { data.readFully(it) }
         val iv = ByteArray(ivSize).also { data.readFully(it) }
         val cipher = cipher(Cipher.DECRYPT_MODE, password, salt, iv)
@@ -501,7 +503,7 @@ internal object BackupCrypto {
 }
 
 private fun ZipFile.readText(name: String): String {
-    val entry = getEntry(name) ?: throw BackupException("The backup is missing $name.")
+    val entry = getEntry(name) ?: throw BackupException(tr("The backup is missing {entry}.", "entry" to name))
     return getInputStream(entry).bufferedReader().use { it.readText() }
 }
 

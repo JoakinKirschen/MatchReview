@@ -1,5 +1,7 @@
 package be.matchreview.app.domain
 
+import be.matchreview.app.i18n.tr
+
 data class RecordingBudget(
     val canStart: Boolean,
     val safeBytesAvailable: Long,
@@ -21,8 +23,8 @@ object StorageBudgetRules {
             canStart = minutes >= 2,
             safeBytesAvailable = safe,
             estimatedMinutes = minutes,
-            message = if (minutes >= 2) "About $minutes minutes of safe recording space."
-                else "Not enough safe storage to start recording."
+            message = if (minutes >= 2) tr("About {minutes} minutes of safe recording space.", "minutes" to minutes)
+                else tr("Not enough safe storage to start recording.")
         )
     }
 }

@@ -1,5 +1,7 @@
 package be.matchreview.app
 
+import be.matchreview.app.i18n.tr
+
 import be.matchreview.app.ui.AppCard
 import be.matchreview.app.ui.AppButton
 import be.matchreview.app.ui.AppOutlinedButton
@@ -46,10 +48,10 @@ internal fun TeamsScreen(vm: MainViewModel, nav: NavHostController) {
     ) {
         item {
             AppButton(onClick = { nav.navigate("team/new") }, modifier = Modifier.fillMaxWidth()) {
-                Text("Add team")
+                Text(tr("Add team"))
             }
         }
-        if (teams.isEmpty()) item { EmptyCard("Create your first team.") }
+        if (teams.isEmpty()) item { EmptyCard(tr("Create your first team.")) }
         items(teams) { team ->
             AppCard(Modifier.fillMaxWidth().clickable { nav.navigate("team/${team.id}") }) {
                 Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -71,15 +73,15 @@ internal fun NewTeamScreen(vm: MainViewModel, nav: NavHostController) {
     var age by remember { mutableStateOf("") }
     var season by remember { mutableStateOf("2026/27") }
     FormColumn {
-        Field(name, { name = it }, "Team name")
-        Field(club, { club = it }, "Club")
-        Field(age, { age = it }, "Age group")
-        Field(season, { season = it }, "Season")
+        Field(name, { name = it }, tr("Team name"))
+        Field(club, { club = it }, tr("Club"))
+        Field(age, { age = it }, tr("Age group"))
+        Field(season, { season = it }, tr("Season"))
         AppButton(
             onClick = { vm.addTeam(name, club, age, season) { nav.popBackStack() } },
             enabled = name.isNotBlank(),
             modifier = Modifier.fillMaxWidth()
-        ) { Text("Save team") }
+        ) { Text(tr("Save team")) }
     }
 }
 
@@ -107,7 +109,7 @@ internal fun TeamScreen(teamId: Long, vm: MainViewModel, nav: NavHostController)
         scope.launch {
             val encoded = withContext(Dispatchers.IO) { TeamLogoCodec.encodeFromUri(context, uri) }
             if (encoded == null) {
-                logoMessage = "That file could not be read as an image. Try a PNG or JPEG file."
+                logoMessage = tr("That file could not be read as an image. Try a PNG or JPEG file.")
             } else {
                 vm.setTeamLogo(teamId, encoded)
                 logoMessage = null
@@ -125,8 +127,8 @@ internal fun TeamScreen(teamId: Long, vm: MainViewModel, nav: NavHostController)
                 SeasonReportPdfExporter.write(it, report, team)
             }
             if (ExternalApps.open(context, uri, "application/pdf")) null
-            else "Season report saved. Install a PDF viewer to open it."
-        }.getOrElse { "Season report failed: ${it.message ?: "unknown error"}" }
+            else tr("Season report saved. Install a PDF viewer to open it.")
+        }.getOrElse { tr("Season report failed: {message}", "message" to (it.message ?: tr("unknown error"))) }
     }
     fun shareSeasonReport(pdf: Boolean) {
         val report = seasonReport ?: return
@@ -134,16 +136,16 @@ internal fun TeamScreen(teamId: Long, vm: MainViewModel, nav: NavHostController)
             if (pdf) {
                 ExternalApps.shareNewFile(
                     context, SeasonReportRules.fileName(report.teamName, "pdf"), "application/pdf",
-                    "Season report ${report.teamName}"
+                    tr("Season report {teamName}", "teamName" to report.teamName)
                 ) { SeasonReportPdfExporter.write(it, report, team) }
             } else {
                 ExternalApps.shareNewFile(
                     context, SeasonReportRules.fileName(report.teamName, "csv"), "text/csv",
-                    "Season report ${report.teamName}"
+                    tr("Season report {teamName}", "teamName" to report.teamName)
                 ) { it.write(SeasonReportRules.toCsv(report).toByteArray()) }
             }
             null
-        }.getOrElse { "Sharing failed: ${it.message ?: "unknown error"}" }
+        }.getOrElse { tr("Sharing failed: {message}", "message" to (it.message ?: tr("unknown error"))) }
     }
     val logoPhotoPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.PickVisualMedia(),
@@ -177,7 +179,7 @@ internal fun TeamScreen(teamId: Long, vm: MainViewModel, nav: NavHostController)
                     }
                     Column(Modifier.weight(1f)) {
                         Text(
-                            team?.name ?: "Team",
+                            team?.name ?: tr("Team"),
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
                             maxLines = 1,
@@ -188,20 +190,20 @@ internal fun TeamScreen(teamId: Long, vm: MainViewModel, nav: NavHostController)
                                 TextButton(
                                     onClick = { logoSourceMenu = true },
                                     enabled = team != null
-                                ) { Text(if (team?.logoPng != null) "Change logo" else "Add logo") }
+                                ) { Text(if (team?.logoPng != null) tr("Change logo") else tr("Add logo")) }
                                 DropdownMenu(
                                     expanded = logoSourceMenu,
                                     onDismissRequest = { logoSourceMenu = false }
                                 ) {
                                     DropdownMenuItem(
-                                        text = { Text("Downloads & files") },
+                                        text = { Text(tr("Downloads & files")) },
                                         onClick = {
                                             logoSourceMenu = false
                                             logoFilePicker.launch(arrayOf("image/*"))
                                         }
                                     )
                                     DropdownMenuItem(
-                                        text = { Text("Photos") },
+                                        text = { Text(tr("Photos")) },
                                         onClick = {
                                             logoSourceMenu = false
                                             logoPhotoPicker.launch(
@@ -212,7 +214,7 @@ internal fun TeamScreen(teamId: Long, vm: MainViewModel, nav: NavHostController)
                                 }
                             }
                             if (team?.logoPng != null) {
-                                TextButton(onClick = { vm.setTeamLogo(teamId, null) }) { Text("Remove") }
+                                TextButton(onClick = { vm.setTeamLogo(teamId, null) }) { Text(tr("Remove")) }
                             }
                         }
                         logoMessage?.let {
@@ -230,7 +232,7 @@ internal fun TeamScreen(teamId: Long, vm: MainViewModel, nav: NavHostController)
                 AppButton(
                     onClick = { showAdd = true },
                     modifier = Modifier.weight(1f)
-                ) { Text("Add player") }
+                ) { Text(tr("Add player")) }
                 AppOutlinedButton(
                     onClick = { showDeleteTeam = true },
                     enabled = team != null,
@@ -238,7 +240,7 @@ internal fun TeamScreen(teamId: Long, vm: MainViewModel, nav: NavHostController)
                         contentColor = MaterialTheme.colorScheme.error
                     ),
                     modifier = Modifier.weight(1f)
-                ) { Text("Remove team") }
+                ) { Text(tr("Remove team")) }
             }
         }
         if (seasonStats.isNotEmpty()) {
@@ -246,10 +248,10 @@ internal fun TeamScreen(teamId: Long, vm: MainViewModel, nav: NavHostController)
             item {
                 AppCard(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text("Season report", style = MaterialTheme.typography.titleMedium)
+                        Text(tr("Season report"), style = MaterialTheme.typography.titleMedium)
                         seasonReport?.summary?.let {
                             Text(
-                                "${it.played} played • ${it.won}W ${it.drawn}D ${it.lost}L • goals ${it.goalsFor}–${it.goalsAgainst}",
+                                tr("{played} played • {won}W {drawn}D {lost}L • goals {goalsFor}–{goalsAgainst}", "played" to it.played, "won" to it.won, "drawn" to it.drawn, "lost" to it.lost, "goalsFor" to it.goalsFor, "goalsAgainst" to it.goalsAgainst),
                                 style = MaterialTheme.typography.bodySmall
                             )
                         }
@@ -260,12 +262,12 @@ internal fun TeamScreen(teamId: Long, vm: MainViewModel, nav: NavHostController)
                                 },
                                 enabled = seasonReport != null,
                                 modifier = Modifier.weight(1f).heightIn(min = 48.dp)
-                            ) { Text("Download PDF") }
+                            ) { Text(tr("Download PDF")) }
                             AppOutlinedButton(
                                 onClick = { shareSeasonReport(pdf = true) },
                                 enabled = seasonReport != null,
                                 modifier = Modifier.heightIn(min = 48.dp)
-                            ) { Text("Share") }
+                            ) { Text(tr("Share")) }
                             AppOutlinedButton(
                                 onClick = { shareSeasonReport(pdf = false) },
                                 enabled = seasonReport != null,
@@ -277,7 +279,7 @@ internal fun TeamScreen(teamId: Long, vm: MainViewModel, nav: NavHostController)
                 }
             }
         }
-        if (players.isEmpty()) item { EmptyCard("No players yet.") }
+        if (players.isEmpty()) item { EmptyCard(tr("No players yet.")) }
         items(players, key = { it.id }) { player ->
             AppCard(
                 Modifier
@@ -298,12 +300,12 @@ internal fun TeamScreen(teamId: Long, vm: MainViewModel, nav: NavHostController)
                         if (player.position.isNotBlank()) Text(player.position)
                         if (player.preferredFoot.isNotBlank()) {
                             Text(
-                                "Preferred foot: ${player.preferredFoot}",
+                                tr("Preferred foot: {preferredFoot}", "preferredFoot" to player.preferredFoot),
                                 style = MaterialTheme.typography.bodySmall
                             )
                         }
                     }
-                    Text("Edit", color = MaterialTheme.colorScheme.primary)
+                    Text(tr("Edit"), color = MaterialTheme.colorScheme.primary)
                 }
             }
         }
@@ -315,12 +317,12 @@ internal fun TeamScreen(teamId: Long, vm: MainViewModel, nav: NavHostController)
         var position by remember { mutableStateOf("") }
         AlertDialog(
             onDismissRequest = { showAdd = false },
-            title = { Text("Add player") },
+            title = { Text(tr("Add player")) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Field(name, { name = it }, "Name")
-                    Field(number, { number = it.filter(Char::isDigit) }, "Shirt number")
-                    Field(position, { position = it }, "Position")
+                    Field(name, { name = it }, tr("Name"))
+                    Field(number, { number = it.filter(Char::isDigit) }, tr("Shirt number"))
+                    Field(position, { position = it }, tr("Position|player"))
                 }
             },
             confirmButton = {
@@ -331,10 +333,10 @@ internal fun TeamScreen(teamId: Long, vm: MainViewModel, nav: NavHostController)
                             showAdd = false
                         }
                     }
-                ) { Text("Add") }
+                ) { Text(tr("Add")) }
             },
             dismissButton = {
-                TextButton(onClick = { showAdd = false }) { Text("Cancel") }
+                TextButton(onClick = { showAdd = false }) { Text(tr("Cancel")) }
             }
         )
     }
@@ -374,13 +376,13 @@ internal fun TeamScreen(teamId: Long, vm: MainViewModel, nav: NavHostController)
         team?.let { selectedTeam ->
             AlertDialog(
                 onDismissRequest = { showDeleteTeam = false },
-                title = { Text("Remove ${selectedTeam.name}?") },
+                title = { Text(tr("Remove {selectedTeamName}?", "selectedTeamName" to selectedTeam.name)) },
                 text = {
                     Text(
                         if (cameraState.isBusy)
-                            "A camera recording is still running or being saved. Stop it before removing the team."
+                            tr("A camera recording is still running or being saved. Stop it before removing the team.")
                         else
-                            "This permanently removes the team, its players, matches, lineups, saved database records and the clips recorded in this app. Imported videos stay on the device. This cannot be undone."
+                            tr("This permanently removes the team, its players, matches, lineups, saved database records and the clips recorded in this app. Imported videos stay on the device. This cannot be undone.")
                     )
                 },
                 confirmButton = {
@@ -405,10 +407,10 @@ internal fun TeamScreen(teamId: Long, vm: MainViewModel, nav: NavHostController)
                         colors = ButtonDefaults.textButtonColors(
                             contentColor = MaterialTheme.colorScheme.error
                         )
-                    ) { Text("Remove permanently") }
+                    ) { Text(tr("Remove permanently")) }
                 },
                 dismissButton = {
-                    TextButton(onClick = { showDeleteTeam = false }) { Text("Cancel") }
+                    TextButton(onClick = { showDeleteTeam = false }) { Text(tr("Cancel")) }
                 }
             )
         }
@@ -425,13 +427,13 @@ internal fun SeasonStatsCard(
     AppCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(vertical = 10.dp)) {
             Text(
-                "Season stats",
+                tr("Season stats"),
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(horizontal = 14.dp)
             )
             Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 4.dp)) {
-                Text("Player", Modifier.weight(1f), style = MaterialTheme.typography.labelMedium)
-                listOf("M", "Min", "G", "A", "S").forEach {
+                Text(tr("Player"), Modifier.weight(1f), style = MaterialTheme.typography.labelMedium)
+                listOf("M", tr("Min"), "G", "A", "S").forEach {
                     Text(
                         it,
                         Modifier.width(40.dp),
@@ -474,7 +476,7 @@ internal fun SeasonStatsCard(
                 }
             }
             Text(
-                "M matches • Min minutes • G goals • A assists • S saves • ✎ corrected",
+                tr("M matches • Min minutes • G goals • A assists • S saves • ✎ corrected"),
                 style = MaterialTheme.typography.labelSmall,
                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 4.dp)
             )
@@ -504,21 +506,21 @@ internal fun PlayerStatsDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Field(matches, { matches = digits(it) }, "Matches", Modifier.weight(1f))
-                    Field(minutes, { minutes = digits(it) }, "Minutes", Modifier.weight(1f))
+                    Field(matches, { matches = digits(it) }, tr("Matches"), Modifier.weight(1f))
+                    Field(minutes, { minutes = digits(it) }, tr("Minutes"), Modifier.weight(1f))
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Field(goals, { goals = digits(it) }, "Goals", Modifier.weight(1f))
-                    Field(assists, { assists = digits(it) }, "Assists", Modifier.weight(1f))
-                    Field(saves, { saves = digits(it) }, "Saves", Modifier.weight(1f))
+                    Field(goals, { goals = digits(it) }, tr("Goals"), Modifier.weight(1f))
+                    Field(assists, { assists = digits(it) }, tr("Assists"), Modifier.weight(1f))
+                    Field(saves, { saves = digits(it) }, tr("Saves"), Modifier.weight(1f))
                 }
                 Text(
-                    "Tracked: ${stats.tracked.matches} M • ${stats.tracked.minutes} min • " +
+                    tr("Tracked: {matches} M • {minutes} min • ", "matches" to stats.tracked.matches, "minutes" to stats.tracked.minutes) +
                         "${stats.tracked.goals} G • ${stats.tracked.assists} A • ${stats.tracked.saves} S",
                     style = MaterialTheme.typography.bodySmall
                 )
                 if (stats.isCorrected) {
-                    TextButton(onClick = onReset) { Text("Reset to tracked") }
+                    TextButton(onClick = onReset) { Text(tr("Reset to tracked")) }
                 }
             }
         },
@@ -533,9 +535,9 @@ internal fun PlayerStatsDialog(
                         saves = saves.toIntOrNull() ?: total.saves
                     )
                 )
-            }) { Text("Save") }
+            }) { Text(tr("Save")) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text(tr("Cancel")) } }
     )
 }
 
@@ -558,23 +560,23 @@ internal fun EditPlayerDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Edit player") },
+        title = { Text(tr("Edit player")) },
         text = {
             Column(
                 Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Field(name, { name = it }, "Name")
-                Field(number, { number = it.filter(Char::isDigit).take(3) }, "Shirt number")
-                Field(position, { position = it }, "Position")
-                Field(preferredFoot, { preferredFoot = it }, "Preferred foot")
-                Field(notes, { notes = it }, "Notes")
+                Field(name, { name = it }, tr("Name"))
+                Field(number, { number = it.filter(Char::isDigit).take(3) }, tr("Shirt number"))
+                Field(position, { position = it }, tr("Position|player"))
+                Field(preferredFoot, { preferredFoot = it }, tr("Preferred foot"))
+                Field(notes, { notes = it }, tr("Notes"))
                 TextButton(
                     onClick = { confirmDelete = true },
                     colors = ButtonDefaults.textButtonColors(
                         contentColor = MaterialTheme.colorScheme.error
                     )
-                ) { Text("Remove player") }
+                ) { Text(tr("Remove player")) }
             }
         },
         confirmButton = {
@@ -591,19 +593,19 @@ internal fun EditPlayerDialog(
                         )
                     )
                 }
-            ) { Text("Save changes") }
+            ) { Text(tr("Save changes")) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text(tr("Cancel")) } }
     )
 
     if (confirmDelete) {
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
-            title = { Text("Remove ${player.name}?") },
+            title = { Text(tr("Remove {playerName}?", "playerName" to player.name)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Remove from team: hides the player from the team and upcoming lineups. Goals, minutes and other match history are kept.")
-                    Text("Delete permanently: also erases their lineups, minutes played and match links. Past events remain without a player name. This cannot be undone.")
+                    Text(tr("Remove from team: hides the player from the team and upcoming lineups. Goals, minutes and other match history are kept."))
+                    Text(tr("Delete permanently: also erases their lineups, minutes played and match links. Past events remain without a player name. This cannot be undone."))
                 }
             },
             confirmButton = {
@@ -611,7 +613,7 @@ internal fun EditPlayerDialog(
                     TextButton(onClick = {
                         confirmDelete = false
                         onArchive()
-                    }) { Text("Remove from team") }
+                    }) { Text(tr("Remove from team")) }
                     TextButton(
                         onClick = {
                             confirmDelete = false
@@ -620,11 +622,11 @@ internal fun EditPlayerDialog(
                         colors = ButtonDefaults.textButtonColors(
                             contentColor = MaterialTheme.colorScheme.error
                         )
-                    ) { Text("Delete permanently") }
+                    ) { Text(tr("Delete permanently")) }
                 }
             },
             dismissButton = {
-                TextButton(onClick = { confirmDelete = false }) { Text("Cancel") }
+                TextButton(onClick = { confirmDelete = false }) { Text(tr("Cancel")) }
             }
         )
     }

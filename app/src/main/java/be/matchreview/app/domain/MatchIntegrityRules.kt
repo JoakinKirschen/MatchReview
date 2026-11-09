@@ -1,5 +1,7 @@
 package be.matchreview.app.domain
 
+import be.matchreview.app.i18n.tr
+
 import be.matchreview.app.data.GameMatch
 import be.matchreview.app.data.MatchEvent
 import be.matchreview.app.data.MatchLineupPlacement
@@ -28,26 +30,26 @@ object MatchIntegrityRules {
         val derivedOurScore = events.count { it.type == "OUR_GOAL" }
         val derivedOpponentScore = events.count { it.type == "OPPONENT_GOAL" }
         if (match.ourScore != derivedOurScore || match.opponentScore != derivedOpponentScore) {
-            add(IntegrityIssue("SCORE_MISMATCH", "Stored score does not match goal events.", IntegritySeverity.BLOCKING))
+            add(IntegrityIssue("SCORE_MISMATCH", tr("Stored score does not match goal events."), IntegritySeverity.BLOCKING))
         }
         if (lineup.count { it.onPitch } > match.playersOnPitch) {
-            add(IntegrityIssue("TOO_MANY_ON_PITCH", "The lineup exceeds the configured match size.", IntegritySeverity.BLOCKING))
+            add(IntegrityIssue("TOO_MANY_ON_PITCH", tr("The lineup exceeds the configured match size."), IntegritySeverity.BLOCKING))
         }
         participations.filter { it.endMatchTimeMs != null }.forEach {
             if (it.endMatchTimeMs!! < it.startMatchTimeMs) {
-                add(IntegrityIssue("NEGATIVE_PARTICIPATION", "A player interval ends before it starts.", IntegritySeverity.BLOCKING))
+                add(IntegrityIssue("NEGATIVE_PARTICIPATION", tr("A player interval ends before it starts."), IntegritySeverity.BLOCKING))
             }
         }
         if (match.status == MatchStatus.FINISHED && participations.any { it.endMatchTimeMs == null }) {
-            add(IntegrityIssue("OPEN_PARTICIPATION", "A finished match still has an open player interval.", IntegritySeverity.WARNING))
+            add(IntegrityIssue("OPEN_PARTICIPATION", tr("A finished match still has an open player interval."), IntegritySeverity.WARNING))
         }
         recordings.filter { it.status == RecordingStatus.COMPLETED }.forEach {
             if (it.uri.isNullOrBlank() || it.recordingDurationMs <= 0L) {
-                add(IntegrityIssue("INVALID_COMPLETED_RECORDING", "A completed recording has no usable file metadata.", IntegritySeverity.WARNING))
+                add(IntegrityIssue("INVALID_COMPLETED_RECORDING", tr("A completed recording has no usable file metadata."), IntegritySeverity.WARNING))
             }
         }
         events.filter { it.recordingSegmentId != null && it.recordingOffsetMs == null }.forEach {
-            add(IntegrityIssue("INCOMPLETE_VIDEO_LINK", "An event has a recording link without an offset.", IntegritySeverity.WARNING))
+            add(IntegrityIssue("INCOMPLETE_VIDEO_LINK", tr("An event has a recording link without an offset."), IntegritySeverity.WARNING))
         }
     }.distinctBy { it.code }
 }

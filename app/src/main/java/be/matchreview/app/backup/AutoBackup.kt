@@ -1,5 +1,7 @@
 package be.matchreview.app.backup
 
+import be.matchreview.app.i18n.tr
+
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -90,7 +92,7 @@ class AutoBackupController(
     /** Remembers the folder and password; [folder] comes from the folder picker. */
     fun enable(folder: Uri, password: String, includeMedia: Boolean): String? {
         if (password.length < MatchBackupManager.MIN_PASSWORD_LENGTH) {
-            return "Use a backup password of at least ${MatchBackupManager.MIN_PASSWORD_LENGTH} characters."
+            return tr("Use a backup password of at least {length} characters.", "length" to MatchBackupManager.MIN_PASSWORD_LENGTH)
         }
         return runCatching {
             context.contentResolver.takePersistableUriPermission(
@@ -106,7 +108,7 @@ class AutoBackupController(
                 .apply()
             _state.value = load()
             null
-        }.getOrElse { "Automatic backup could not be turned on: ${it.message ?: "unknown error"}" }
+        }.getOrElse { tr("Automatic backup could not be turned on: {message}", "message" to (it.message ?: tr("unknown error"))) }
     }
 
     fun setIncludeMedia(includeMedia: Boolean) {
@@ -139,7 +141,7 @@ class AutoBackupController(
         val includeMedia = prefs.getBoolean(KEY_MEDIA, false)
         val outcome = runCatching {
             val password = prefs.getString(KEY_PASSWORD, null)?.let(::decrypt)
-                ?: throw BackupException("The saved backup password is missing. Turn automatic backup on again.")
+                ?: throw BackupException(tr("The saved backup password is missing. Turn automatic backup on again."))
             val now = System.currentTimeMillis()
             val target = withContext(Dispatchers.IO) {
                 createDocument(Uri.parse(folder), AutoBackupRules.fileName(now))
@@ -165,7 +167,7 @@ class AutoBackupController(
                     .apply()
             },
             onFailure = { error ->
-                prefs.edit().putString(KEY_LAST_ERROR, error.message ?: "Automatic backup failed.").apply()
+                prefs.edit().putString(KEY_LAST_ERROR, error.message ?: tr("Automatic backup failed.")).apply()
             }
         )
         _state.value = load()
@@ -178,7 +180,7 @@ class AutoBackupController(
             DocumentsContract.createDocument(context.contentResolver, parent, "application/octet-stream", name)
         } catch (error: Exception) {
             null
-        } ?: throw BackupException("The backup folder can no longer be written. Choose the folder again.")
+        } ?: throw BackupException(tr("The backup folder can no longer be written. Choose the folder again."))
     }
 
     /** The newest automatic backup in the chosen folder, to share it to another app. */

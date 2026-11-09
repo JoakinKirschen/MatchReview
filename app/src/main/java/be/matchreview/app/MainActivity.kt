@@ -1,5 +1,7 @@
 package be.matchreview.app
 
+import be.matchreview.app.i18n.tr
+
 import be.matchreview.app.ui.isLandscape
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -13,7 +15,6 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.SportsSoccer
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -85,23 +86,23 @@ fun MatchReviewApp(
     val isTopLevel = route in topLevelRoutes
     val screenTitle = when {
         route == "home" -> "MatchReview"
-        route == "teams" -> "Teams"
-        route == "matches" -> "Matches"
-        route == "team/new" -> "New team"
-        route.startsWith("team/") -> "Team details"
-        route == "match/new" -> "New match"
-        route.startsWith("squad/") -> "Select squad"
-        route.startsWith("lineup/") -> "Starting lineup"
-        route.startsWith("ready/") -> "Match-day check"
-        route.startsWith("review/") -> "Match review"
-        route == "backup" -> "Backup & restore"
+        route == "teams" -> tr("Teams")
+        route == "matches" -> tr("Matches")
+        route == "team/new" -> tr("New team")
+        route.startsWith("team/") -> tr("Team details")
+        route == "match/new" -> tr("New match")
+        route.startsWith("squad/") -> tr("Select squad")
+        route.startsWith("lineup/") -> tr("Starting lineup")
+        route.startsWith("ready/") -> tr("Match-day check")
+        route.startsWith("review/") -> tr("Match review")
+        route == "backup" -> tr("Backup & restore")
         else -> "MatchReview"
     }
     val landscape = isLandscape()
     val topLevelItems = listOf(
-        Triple("home", R.string.nav_home, Icons.Default.Home),
-        Triple("teams", R.string.nav_teams, Icons.Default.Groups),
-        Triple("matches", R.string.nav_matches, Icons.Default.SportsSoccer)
+        Triple("home", "Home|navigation", Icons.Default.Home),
+        Triple("teams", "Teams", Icons.Default.Groups),
+        Triple("matches", "Matches", Icons.Default.SportsSoccer)
     )
     fun openTopLevel(itemRoute: String) {
         nav.navigate(itemRoute) {
@@ -120,7 +121,7 @@ fun MatchReviewApp(
                             IconButton(onClick = { nav.navigateUp() }) {
                                 Icon(
                                     Icons.AutoMirrored.Filled.ArrowBack,
-                                    contentDescription = stringResource(R.string.navigate_back)
+                                    contentDescription = tr("Back")
                                 )
                             }
                         }
@@ -136,8 +137,8 @@ fun MatchReviewApp(
         bottomBar = {
             if (!immersiveMatchDay && isTopLevel && !landscape) {
                 NavigationBar {
-                    topLevelItems.forEach { (itemRoute, labelResource, icon) ->
-                        val label = stringResource(labelResource)
+                    topLevelItems.forEach { (itemRoute, englishLabel, icon) ->
+                        val label = tr(englishLabel)
                         NavigationBarItem(
                             selected = route == itemRoute,
                             onClick = { openTopLevel(itemRoute) },
@@ -153,8 +154,8 @@ fun MatchReviewApp(
             // Held sideways, the sections move to a rail on the left so the screens keep their height.
             if (!immersiveMatchDay && isTopLevel && landscape) {
                 NavigationRail {
-                    topLevelItems.forEach { (itemRoute, labelResource, icon) ->
-                        val label = stringResource(labelResource)
+                    topLevelItems.forEach { (itemRoute, englishLabel, icon) ->
+                        val label = tr(englishLabel)
                         NavigationRailItem(
                             selected = route == itemRoute,
                             onClick = { openTopLevel(itemRoute) },

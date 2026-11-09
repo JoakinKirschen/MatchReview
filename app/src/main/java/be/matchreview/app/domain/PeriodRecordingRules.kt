@@ -1,15 +1,20 @@
 package be.matchreview.app.domain
 
+import be.matchreview.app.i18n.tr
+
 import be.matchreview.app.data.MatchStatus
 
 /** When the camera stops filming by itself. */
-enum class RecordingStopMode(val label: String, val shortLabel: String) {
+enum class RecordingStopMode(private val englishLabel: String, private val englishShortLabel: String) {
     /** Only the coach stops the recording. */
     MANUAL("Only when I stop it", "manual"),
     /** When the coach ends the period; recording restarts with the next period. */
     PERIOD_END("When I end the period", "at period end"),
     /** When the planned period time is up, even if play goes on; restarts with the next period. */
     PLANNED_TIME("When the planned time is up", "when time is up");
+
+    val label: String get() = tr(englishLabel)
+    val shortLabel: String get() = tr(englishShortLabel)
 
     /** Whether the recording restarts by itself when the next period starts. */
     val followsPeriods: Boolean get() = this != MANUAL

@@ -1,5 +1,7 @@
 package be.matchreview.app
 
+import be.matchreview.app.i18n.tr
+
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
@@ -57,40 +59,40 @@ object MatchPdfExporter {
             val writer = PdfWriter(document)
             val names = players.associate { it.id to it.name }
             val playersById = players.associateBy { it.id }
-            val teamName = team?.name ?: "Our team"
+            val teamName = team?.name ?: tr("Our team")
 
             TeamLogoCodec.decode(team?.logoPng)?.let { writer.logo(it) }
             writer.heading(
-                if (match.isHome) "$teamName vs ${match.opponent}" else "${match.opponent} vs $teamName"
+                if (match.isHome) tr("{teamName} vs {opponent}", "teamName" to teamName, "opponent" to match.opponent) else tr("{opponent} vs {teamName}", "opponent" to match.opponent, "teamName" to teamName)
             )
             writer.text(
-                "${if (match.isHome) "Home" else "Away"} match • match summary",
+                tr("{away} match • match summary", "away" to (if (match.isHome) tr("Home") else tr("Away"))),
                 emphasized = true
             )
             writer.text(listOf(match.matchDate, match.competition, match.venue)
                 .filter { it.isNotBlank() }
                 .joinToString("  |  "))
             writer.spacer(5f)
-            writer.labelValue("Score", "${match.ourScore} - ${match.opponentScore}")
+            writer.labelValue(tr("Score"), "${match.ourScore} - ${match.opponentScore}")
             val goalLines = GoalSummaryRules.lines(events, names, teamName, match.opponent)
-            if (goalLines.isNotEmpty()) writer.labelValue("Goals", goalLines.joinToString(", "))
-            writer.labelValue("Status", match.status.name.replace('_', ' ').lowercase()
+            if (goalLines.isNotEmpty()) writer.labelValue(tr("Goals"), goalLines.joinToString(", "))
+            writer.labelValue(tr("Status"), match.status.name.replace('_', ' ').lowercase()
                 .replaceFirstChar { it.titlecase() })
-            writer.labelValue("Match size", "${match.playersOnPitch}v${match.playersOnPitch}")
-            writer.labelValue("Formation", match.formation)
+            writer.labelValue(tr("Match size"), "${match.playersOnPitch}v${match.playersOnPitch}")
+            writer.labelValue(tr("Formation"), match.formation)
             writer.labelValue(
-                "Timing",
-                "${match.periodCount} x ${match.periodDurationMinutes} minutes"
+                tr("Timing"),
+                tr("{periodCount} x {minutes} minutes", "periodCount" to match.periodCount, "minutes" to match.periodDurationMinutes)
             )
             writer.labelValue(
-                "Substitutions",
-                if (match.rollingSubstitutions) "Rolling" else "No re-entry"
+                tr("Substitutions"),
+                if (match.rollingSubstitutions) tr("Rolling") else tr("No re-entry")
             )
-            if (match.teamRating > 0) writer.labelValue("Team rating", "${match.teamRating}/10")
+            if (match.teamRating > 0) writer.labelValue(tr("Team rating"), "${match.teamRating}/10")
 
             val stats = MatchStatsRules.compute(events)
             if (stats.hasDetail) {
-                writer.section("Match stats")
+                writer.section(tr("Match stats"))
                 writer.table(
                     headers = listOf("", teamName, match.opponent),
                     rows = MatchStatsRules.rows(stats).map { (label, ours, theirs) ->
@@ -106,9 +108,9 @@ object MatchPdfExporter {
             // The lineup pictures start with the starting lineup, rebuilt for older matches.
             val lineupEvents = StartingLineupRules.withStartingLineup(match.id, matchEvents, participations, lineup)
                 .sortedWith(compareBy<MatchEvent> { it.timestampMs }.thenBy { it.id })
-            writer.section("Timeline")
+            writer.section(tr("Timeline"))
             if (matchEvents.isEmpty()) {
-                writer.text("No events recorded.")
+                writer.text(tr("No events recorded."))
             } else {
                 matchEvents
                     // Marks only help find moments in the video; they are not match facts.
@@ -127,15 +129,15 @@ object MatchPdfExporter {
                             people,
                             event.note,
                             GoalMouthGeometry.describe(event.goalX, event.goalY)
-                                ?.let { "goal position: $it" }.orEmpty()
+                                ?.let { tr("goal position: {value}", "value" to it) }.orEmpty()
                         ).filter { it.isNotBlank() }.joinToString(" - ")
                         writer.bullet(detail)
                     }
             }
 
             if (videoTags.isNotEmpty()) {
-                writer.section("Imported video tags")
-                writer.text("Times are positions in the imported video, not match time.", small = true)
+                writer.section(tr("Imported video tags"))
+                writer.text(tr("Times are positions in the imported video, not match time."), small = true)
                 videoTags.forEach { tag ->
                     writer.bullet(
                         listOf(
@@ -153,8 +155,8 @@ object MatchPdfExporter {
                 .group(lineupEvents)
                 .filterIsInstance<TimelineItem.LineupChange>()
             if (lineupChanges.isNotEmpty()) {
-                writer.section("Starting lineup and changes")
-                writer.text("Highlighted players came on at that moment.", small = true)
+                writer.section(tr("Starting lineup and changes"))
+                writer.text(tr("Highlighted players came on at that moment."), small = true)
                 lineupChanges.chunked(3).forEach { row ->
                     writer.block(PITCH_HEIGHT + 30f) { canvas, top ->
                         row.forEachIndexed { index, change ->
@@ -165,25 +167,25 @@ object MatchPdfExporter {
                 }
             }
 
-            writer.section("Goalkeeping")
+            writer.section(tr("Goalkeeping"))
             val saves = events.filter { it.type == "KEEPER_SAVE" }
-            writer.text("${saves.size} save(s), ${match.opponentScore} goal(s) conceded")
+            writer.text(tr("{savesCount} save(s), {opponentScore} goal(s) conceded", "savesCount" to saves.size, "opponentScore" to match.opponentScore))
             saves.groupBy { it.playerId }.forEach { (keeperId, keeperSaves) ->
-                writer.bullet("${keeperId?.let { names[it] } ?: "Keeper not assigned"} - ${keeperSaves.size} save(s)")
+                writer.bullet(tr("{names} - {keeperSavesCount} save(s)", "names" to (keeperId?.let { names[it] } ?: tr("Keeper not assigned")), "keeperSavesCount" to keeperSaves.size))
             }
 
             val placedGoals = events.filter {
                 (it.type == "OUR_GOAL" || it.type == "OPPONENT_GOAL") && it.goalX != null && it.goalY != null
             }
             if (placedGoals.isNotEmpty()) {
-                writer.section("Goal map")
-                writer.text("Green: $teamName goals. Red: ${match.opponent} goals.", small = true)
+                writer.section(tr("Goal map"))
+                writer.text(tr("Green: {teamName} goals. Red: {opponent} goals.", "teamName" to teamName, "opponent" to match.opponent), small = true)
                 writer.block(GOAL_MAP_HEIGHT + 8f) { canvas, top ->
                     drawGoalMap(canvas, placedGoals, MARGIN, top)
                 }
             }
 
-            writer.section("Player participation")
+            writer.section(tr("Player participation"))
             val minutesByPlayer = participations
                 .groupBy { it.playerId }
                 .mapValues { (_, intervals) ->
@@ -193,7 +195,7 @@ object MatchPdfExporter {
                     }
                 }
             if (minutesByPlayer.isEmpty()) {
-                writer.text("No participation data recorded.")
+                writer.text(tr("No participation data recorded."))
             } else {
                 minutesByPlayer.entries
                     .sortedBy { names[it.key].orEmpty().lowercase(Locale.ROOT) }
@@ -202,21 +204,21 @@ object MatchPdfExporter {
                     }
             }
 
-            writer.section("Video")
+            writer.section(tr("Video"))
             val completedRecordings = recordings.count { it.uri != null }
             val durationMs = recordings.sumOf { it.recordingDurationMs }
             writer.text(
-                "$completedRecordings saved recording${if (completedRecordings == 1) "" else "s"}" +
-                    if (durationMs > 0) " - ${formatTime(durationMs)} total" else ""
+                (if (completedRecordings == 1) tr("1 saved recording") else tr("{count} saved recordings", "count" to completedRecordings)) +
+                    if (durationMs > 0) tr(" - {time} total", "time" to (formatTime(durationMs))) else ""
             )
 
-            writer.section("Review notes")
-            writer.text(match.reviewNotes.ifBlank { "No review notes." })
+            writer.section(tr("Review notes"))
+            writer.text(match.reviewNotes.ifBlank { tr("No review notes.") })
 
             writer.spacer(10f)
             writer.text(
-                "Privacy notice: this summary contains player names and match data. " +
-                    "Share and store it only with appropriate permission.",
+                tr("Privacy notice: this summary contains player names and match data. ") +
+                    tr("Share and store it only with appropriate permission."),
                 small = true
             )
             writer.finish()
@@ -251,8 +253,8 @@ object MatchPdfExporter {
         }
         val pitch = RectF(left, top + 14f, left + PITCH_WIDTH, top + 14f + PITCH_HEIGHT)
         val label = when {
-            change.isStartingLineup && change.isApproximate -> "Start (approximate)"
-            change.isStartingLineup -> "Start"
+            change.isStartingLineup && change.isApproximate -> tr("Start (approximate)")
+            change.isStartingLineup -> tr("Start")
             else -> formatTime(change.timestampMs)
         }
         canvas.drawText(label, left, top + 10f, caption)
@@ -334,6 +336,6 @@ object MatchPdfExporter {
     private fun formatMinutes(milliseconds: Long): String {
         val totalMinutes = milliseconds.coerceAtLeast(0L) / 60_000L
         val seconds = (milliseconds.coerceAtLeast(0L) / 1_000L) % 60L
-        return if (seconds == 0L) "$totalMinutes min" else "$totalMinutes min ${seconds}s"
+        return if (seconds == 0L) tr("{minutes} min", "minutes" to totalMinutes) else tr("{minutes} min {seconds}s", "minutes" to totalMinutes, "seconds" to seconds)
     }
 }

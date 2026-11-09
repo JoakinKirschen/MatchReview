@@ -1,5 +1,7 @@
 package be.matchreview.app
 
+import be.matchreview.app.i18n.tr
+
 import be.matchreview.app.ui.AppCard
 import be.matchreview.app.ui.AppButton
 import be.matchreview.app.ui.AppOutlinedButton
@@ -58,11 +60,13 @@ import be.matchreview.app.recording.activeMatchId
 import be.matchreview.app.recording.activeRecordingId
 import java.util.*
 
-internal enum class ReviewSection(val label: String) {
+internal enum class ReviewSection(private val englishLabel: String) {
     SUMMARY("Report"),
     TIMELINE("Timeline"),
     VIDEO("Video"),
-    DATA("Data")
+    DATA("Data");
+
+    val label: String get() = tr(englishLabel)
 }
 
 
@@ -110,14 +114,14 @@ internal fun ReviewScreen(matchId: Long, vm: MainViewModel, nav: NavHostControll
         ActivityResultContracts.CreateDocument("text/csv")
     ) { uri ->
         if (uri == null) {
-            exportMessage = "Export cancelled"
+            exportMessage = tr("Export cancelled")
         } else {
             exportMessage = runCatching {
                 context.contentResolver.openOutputStream(uri, "wt")!!.bufferedWriter().use {
                     it.write(exportContent)
                 }
-                "Export saved"
-            }.getOrElse { "Export failed: ${it.message ?: "unknown error"}" }
+                tr("Export saved")
+            }.getOrElse { tr("Export failed: {message}", "message" to (it.message ?: tr("unknown error"))) }
         }
     }
     fun writeSummaryPdf(output: java.io.OutputStream) = MatchPdfExporter.write(
@@ -127,14 +131,14 @@ internal fun ReviewScreen(matchId: Long, vm: MainViewModel, nav: NavHostControll
         ActivityResultContracts.CreateDocument("application/pdf")
     ) { uri ->
         if (uri == null) {
-            exportMessage = "PDF download cancelled"
+            exportMessage = tr("PDF download cancelled")
         } else {
             exportMessage = runCatching {
                 context.contentResolver.openOutputStream(uri, "w")!!.use(::writeSummaryPdf)
                 // Open the saved summary straight away so it can be checked and shared.
-                if (ExternalApps.open(context, uri, "application/pdf")) "PDF summary saved"
-                else "PDF summary saved. Install a PDF viewer to open it."
-            }.getOrElse { "PDF export failed: ${it.message ?: "unknown error"}" }
+                if (ExternalApps.open(context, uri, "application/pdf")) tr("PDF summary saved")
+                else tr("PDF summary saved. Install a PDF viewer to open it.")
+            }.getOrElse { tr("PDF export failed: {message}", "message" to (it.message ?: tr("unknown error"))) }
         }
     }
 
@@ -159,10 +163,10 @@ internal fun ReviewScreen(matchId: Long, vm: MainViewModel, nav: NavHostControll
             }
             if (persisted.isSuccess) {
                 vm.setVideo(current.id, uri.toString())
-                videoImportMessage = "Video linked for future review."
+                videoImportMessage = tr("Video linked for future review.")
             } else {
                 videoImportMessage =
-                    "This provider did not grant lasting access. Choose a local file or another provider."
+                    tr("This provider did not grant lasting access. Choose a local file or another provider.")
             }
         }
     }
@@ -172,14 +176,14 @@ internal fun ReviewScreen(matchId: Long, vm: MainViewModel, nav: NavHostControll
             TeamLogoImage(team?.logoPng, 48.dp, Modifier.padding(end = 12.dp))
             Column(Modifier.weight(1f)) {
                 Text(
-                    if (current.isHome) "${team?.name ?: "Home"} vs ${current.opponent}"
-                    else "${current.opponent} vs ${team?.name ?: "Away"}",
+                    if (current.isHome) tr("{teamName} vs {opponent}", "teamName" to (team?.name ?: tr("Home")), "opponent" to current.opponent)
+                    else tr("{opponent} vs {teamName}", "opponent" to current.opponent, "teamName" to (team?.name ?: tr("Away"))),
                     style = MaterialTheme.typography.headlineSmall
                 )
                 Text(
                     listOf(
                         current.matchDate,
-                        if (current.isHome) "Home" else "Away",
+                        if (current.isHome) tr("Home") else tr("Away"),
                         current.venue,
                         current.competition,
                         current.formation
@@ -187,7 +191,7 @@ internal fun ReviewScreen(matchId: Long, vm: MainViewModel, nav: NavHostControll
                     style = MaterialTheme.typography.bodySmall
                 )
             }
-            TextButton(onClick = { showDetailsEditor = true }) { Text("Edit") }
+            TextButton(onClick = { showDetailsEditor = true }) { Text(tr("Edit")) }
         }
         if (current.status == MatchStatus.FINISHED && backupDue) {
             AppCard(
@@ -199,11 +203,11 @@ internal fun ReviewScreen(matchId: Long, vm: MainViewModel, nav: NavHostControll
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        "This match is not in a backup yet.",
+                        tr("This match is not in a backup yet."),
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.weight(1f)
                     )
-                    TextButton(onClick = { nav.navigate("backup") }) { Text("Back up now") }
+                    TextButton(onClick = { nav.navigate("backup") }) { Text(tr("Back up now")) }
                 }
             }
         }
@@ -213,7 +217,7 @@ internal fun ReviewScreen(matchId: Long, vm: MainViewModel, nav: NavHostControll
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(Modifier.padding(12.dp)) {
-                    Text("Data integrity check", style = MaterialTheme.typography.titleMedium)
+                    Text(tr("Data integrity check"), style = MaterialTheme.typography.titleMedium)
                     integrityIssues.take(3).forEach { Text("• ${it.message}", style = MaterialTheme.typography.bodySmall) }
                 }
             }
@@ -224,7 +228,7 @@ internal fun ReviewScreen(matchId: Long, vm: MainViewModel, nav: NavHostControll
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(Modifier.padding(12.dp)) {
-                    Text("Recording check", style = MaterialTheme.typography.titleMedium)
+                    Text(tr("Recording check"), style = MaterialTheme.typography.titleMedium)
                     mediaIssues.take(3).forEach { Text("• ${it.message}", style = MaterialTheme.typography.bodySmall) }
                 }
             }
@@ -239,7 +243,7 @@ internal fun ReviewScreen(matchId: Long, vm: MainViewModel, nav: NavHostControll
                 },
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text(if (current.status == MatchStatus.LINEUP_READY) "Check match readiness" else "Resume live match")
+                Text(if (current.status == MatchStatus.LINEUP_READY) tr("Check match readiness") else tr("Resume live match"))
             }
         }
         // Squad and lineup can only change before kick-off; afterwards the buttons are hidden.
@@ -249,13 +253,13 @@ internal fun ReviewScreen(matchId: Long, vm: MainViewModel, nav: NavHostControll
                     onClick = { nav.navigate("squad/$matchId") },
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text("Edit squad")
+                    Text(tr("Edit squad"))
                 }
                 AppTonalButton(
                     onClick = { nav.navigate("lineup/$matchId") },
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text("Starting lineup")
+                    Text(tr("Starting lineup"))
                 }
             }
         }
@@ -276,29 +280,29 @@ internal fun ReviewScreen(matchId: Long, vm: MainViewModel, nav: NavHostControll
         val matchClips = remember(recordings, periods) { MatchVideoRules.clips(recordings, periods) }
         AppCard(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("Match recording", style = MaterialTheme.typography.titleMedium)
+                Text(tr("Match recording"), style = MaterialTheme.typography.titleMedium)
                 if (matchClips.isEmpty()) {
                     Text(
-                        "Record the match with the camera in the live screen to watch it here.",
+                        tr("Record the match with the camera in the live screen to watch it here."),
                         style = MaterialTheme.typography.bodySmall
                     )
                 } else {
                     Text(
-                        "${matchClips.size} clip(s) • ${formatTime(MatchVideoRules.totalDurationMs(matchClips))}. " +
-                            "Plays all clips one after another; jump to any period or event.",
+                        tr("{matchClipsCount} clip(s) • {time}. ", "matchClipsCount" to matchClips.size, "time" to (formatTime(MatchVideoRules.totalDurationMs(matchClips)))) +
+                            tr("Plays all clips one after another; jump to any period or event."),
                         style = MaterialTheme.typography.bodySmall
                     )
                     AppButton(
                         onClick = { showFullVideo = true },
                         modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
-                    ) { Text("Watch full match") }
+                    ) { Text(tr("Watch full match")) }
                 }
             }
         }
         HighlightsCard(current, events, recordings, matchClips, allPlayers.associateBy { it.id })
 
         // A video from another camera (a parent's phone, a club camera) can be linked and tagged.
-        Text("Video from another camera", style = MaterialTheme.typography.titleMedium)
+        Text(tr("Video from another camera"), style = MaterialTheme.typography.titleMedium)
         if (player != null) {
             AndroidView(
                 factory = { ctx ->
@@ -314,21 +318,21 @@ internal fun ReviewScreen(matchId: Long, vm: MainViewModel, nav: NavHostControll
                 AppButton(
                     onClick = { tagPosition = player?.currentPosition ?: 0L; showTag = true },
                     modifier = Modifier.weight(1f)
-                ) { Text("Tag moment") }
+                ) { Text(tr("Tag moment")) }
                 AppOutlinedButton(onClick = { videoPicker.launch(arrayOf("video/*")) }, modifier = Modifier.weight(1f)) {
-                    Text("Change video")
+                    Text(tr("Change video"))
                 }
             }
         } else {
             AppOutlinedButton(
                 onClick = { videoPicker.launch(arrayOf("video/*")) },
                 modifier = Modifier.fillMaxWidth()
-            ) { Text("Import a match video") }
+            ) { Text(tr("Import a match video")) }
         }
         videoImportMessage?.let { message ->
             AppCard(
                 colors = CardDefaults.cardColors(
-                    containerColor = if (message.startsWith("Video linked")) {
+                    containerColor = if (message == tr("Video linked for future review.")) {
                         MaterialTheme.colorScheme.secondaryContainer
                     } else {
                         MaterialTheme.colorScheme.errorContainer
@@ -340,15 +344,15 @@ internal fun ReviewScreen(matchId: Long, vm: MainViewModel, nav: NavHostControll
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(message, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
-                    TextButton(onClick = { videoImportMessage = null }) { Text("Dismiss") }
+                    TextButton(onClick = { videoImportMessage = null }) { Text(tr("Dismiss")) }
                 }
             }
         }
         }
 
         if (reviewSection == ReviewSection.TIMELINE) {
-        Text("Event timeline", style = MaterialTheme.typography.titleLarge)
-        if (events.isEmpty()) EmptyCard("Play the video and tag important moments.")
+        Text(tr("Event timeline"), style = MaterialTheme.typography.titleLarge)
+        if (events.isEmpty()) EmptyCard(tr("Play the video and tag important moments."))
         val playersById = allPlayers.associateBy { it.id }
         // Live events use match time while imported-video tags use the video position, so
         // they are listed separately instead of being sorted into one misleading order.
@@ -357,10 +361,10 @@ internal fun ReviewScreen(matchId: Long, vm: MainViewModel, nav: NavHostControll
             .sortedWith(compareBy<MatchEvent> { it.timestampMs }.thenBy { it.id })
             .partition(VideoEventRules::isImportedVideoTag)
         listOf(
-            Triple("Match events", "Times are match time.", TimelineGrouping.group(matchEvents)),
+            Triple(tr("Match events"), tr("Times are match time."), TimelineGrouping.group(matchEvents)),
             Triple(
-                "Imported video tags",
-                "Times are positions in the imported video.",
+                tr("Imported video tags"),
+                tr("Times are positions in the imported video."),
                 videoTags.map { TimelineItem.Single(it) }
             )
         ).filter { it.third.isNotEmpty() }.forEach { (sectionTitle, sectionHint, sectionItems) ->
@@ -375,7 +379,7 @@ internal fun ReviewScreen(matchId: Long, vm: MainViewModel, nav: NavHostControll
                     trailing = {
                         Column(horizontalAlignment = Alignment.End) {
                             if (VideoEventRules.isPlayable(first, recordings)) {
-                                TextButton(onClick = { selectedClipEvent = first }) { Text("▶ Clip") }
+                                TextButton(onClick = { selectedClipEvent = first }) { Text(tr("▶ Clip")) }
                             }
                         }
                     }
@@ -407,23 +411,23 @@ internal fun ReviewScreen(matchId: Long, vm: MainViewModel, nav: NavHostControll
                                 playerName,
                                 event.sentiment,
                                 event.note.takeIf { it.isNotBlank() },
-                                GoalMouthGeometry.describe(event.goalX, event.goalY)?.let { "goal position: $it" }
+                                GoalMouthGeometry.describe(event.goalX, event.goalY)?.let { tr("goal position: {value}", "value" to it) }
                             ).joinToString(" • ")
                         )
                         Text(
                             when {
-                                videoTag -> "Imported video position"
-                                clipPlayable -> "Match time • tap to play the recorded clip"
-                                else -> "Match time • no recorded clip"
+                                videoTag -> tr("Imported video position")
+                                clipPlayable -> tr("Match time • tap to play the recorded clip")
+                                else -> tr("Match time • no recorded clip")
                             },
                             style = MaterialTheme.typography.bodySmall
                         )
                     }
                     Column(horizontalAlignment = Alignment.End) {
                         if (scoring) {
-                            TextButton(onClick = { goalPositionEvent = event }) { Text("Position") }
+                            TextButton(onClick = { goalPositionEvent = event }) { Text(tr("Position")) }
                         }
-                        TextButton(onClick = { pendingEventDeletion = event }) { Text("Delete") }
+                        TextButton(onClick = { pendingEventDeletion = event }) { Text(tr("Delete")) }
                     }
                 }
             }
@@ -435,14 +439,14 @@ internal fun ReviewScreen(matchId: Long, vm: MainViewModel, nav: NavHostControll
             val goalLines = GoalSummaryRules.lines(
                 events,
                 allPlayers.associate { it.id to it.name },
-                team?.name ?: "Our team",
+                team?.name ?: tr("Our team"),
                 current.opponent
             )
             if (goalLines.isNotEmpty()) {
                 AppCard(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         Text(
-                            "Goals • ${current.ourScore}–${current.opponentScore}",
+                            tr("Goals • {ourScore}–{opponentScore}", "ourScore" to current.ourScore, "opponentScore" to current.opponentScore),
                             style = MaterialTheme.typography.titleMedium
                         )
                         goalLines.forEach { Text(it, style = MaterialTheme.typography.bodyMedium) }
@@ -453,10 +457,10 @@ internal fun ReviewScreen(matchId: Long, vm: MainViewModel, nav: NavHostControll
             if (matchStats.hasDetail) {
                 AppCard(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text("Match stats", style = MaterialTheme.typography.titleMedium)
+                        Text(tr("Match stats"), style = MaterialTheme.typography.titleMedium)
                         Row(Modifier.fillMaxWidth()) {
                             Spacer(Modifier.weight(1.4f))
-                            Text(team?.name ?: "Our team", Modifier.weight(1f), fontWeight = FontWeight.Bold,
+                            Text(team?.name ?: tr("Our team"), Modifier.weight(1f), fontWeight = FontWeight.Bold,
                                 textAlign = TextAlign.End, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Text(current.opponent, Modifier.weight(1f), fontWeight = FontWeight.Bold,
                                 textAlign = TextAlign.End, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -474,8 +478,8 @@ internal fun ReviewScreen(matchId: Long, vm: MainViewModel, nav: NavHostControll
             val saves = events.filter { it.type == "KEEPER_SAVE" }
             AppCard(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("Goalkeeping", style = MaterialTheme.typography.titleMedium)
-                    Text("${saves.size} save(s) • ${current.opponentScore} goal(s) conceded")
+                    Text(tr("Goalkeeping"), style = MaterialTheme.typography.titleMedium)
+                    Text(tr("{savesCount} save(s) • {opponentScore} goal(s) conceded", "savesCount" to saves.size, "opponentScore" to current.opponentScore))
                     saves.groupBy { it.playerId }.forEach { (keeperId, keeperSaves) ->
                         Text(
                             "${teamPlayers.firstOrNull { it.id == keeperId }?.name ?: "Keeper not assigned"}: ${keeperSaves.size}",
@@ -490,7 +494,7 @@ internal fun ReviewScreen(matchId: Long, vm: MainViewModel, nav: NavHostControll
                 AppTonalButton(
                     onClick = { pdfExportLauncher.launch(MatchPdfExporter.fileName(current)) },
                     modifier = Modifier.weight(1f).heightIn(min = 48.dp)
-                ) { Text("Download PDF summary") }
+                ) { Text(tr("Download PDF summary")) }
                 AppOutlinedButton(
                     onClick = {
                         exportMessage = runCatching {
@@ -498,15 +502,16 @@ internal fun ReviewScreen(matchId: Long, vm: MainViewModel, nav: NavHostControll
                                 context,
                                 MatchPdfExporter.fileName(current),
                                 "application/pdf",
-                                "Match summary vs ${current.opponent}",
+                                tr("Match summary vs {opponent}", "opponent" to current.opponent),
                                 ::writeSummaryPdf
                             )
                             null
-                        }.getOrElse { "PDF sharing failed: ${it.message ?: "unknown error"}" }
+                        }.getOrElse { tr("PDF sharing failed: {message}", "message" to (it.message ?: tr("unknown error"))) }
                     },
                     modifier = Modifier.heightIn(min = 48.dp)
-                ) { Text("Share") }
+                ) { Text(tr("Share")) }
             }
+            // The Dutch PDF messages start with "PDF" too.
             exportMessage?.takeIf { it.startsWith("PDF") }?.let {
                 Text(it, style = MaterialTheme.typography.bodySmall)
             }
@@ -514,9 +519,9 @@ internal fun ReviewScreen(matchId: Long, vm: MainViewModel, nav: NavHostControll
 
         if (reviewSection == ReviewSection.DATA) {
         HorizontalDivider()
-        Text("Data and privacy", style = MaterialTheme.typography.titleLarge)
+        Text(tr("Data and privacy"), style = MaterialTheme.typography.titleLarge)
         Text(
-            "Exports contain player names and match details. Share them only with people who are authorised to receive this data.",
+            tr("Exports contain player names and match details. Share them only with people who are authorised to receive this data."),
             style = MaterialTheme.typography.bodySmall
         )
         Row(
@@ -525,10 +530,10 @@ internal fun ReviewScreen(matchId: Long, vm: MainViewModel, nav: NavHostControll
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Column(Modifier.weight(1f)) {
-                Text("Privacy-safe CSV", style = MaterialTheme.typography.titleSmall)
+                Text(tr("Privacy-safe CSV"), style = MaterialTheme.typography.titleSmall)
                 Text(
-                    if (redactedExport) "Player names, notes, and media locations are removed."
-                    else "Identifiable player data will be included.",
+                    if (redactedExport) tr("Player names, notes, and media locations are removed.")
+                    else tr("Identifiable player data will be included."),
                     style = MaterialTheme.typography.bodySmall
                 )
             }
@@ -551,11 +556,11 @@ internal fun ReviewScreen(matchId: Long, vm: MainViewModel, nav: NavHostControll
                 exportLauncher.launch(MatchExportFormatter.fileName(current))
             },
             modifier = Modifier.fillMaxWidth()
-        ) { Text("Export match data (CSV)") }
+        ) { Text(tr("Export match data (CSV)")) }
         AppOutlinedButton(
             onClick = { nav.navigate("backup") },
             modifier = Modifier.fillMaxWidth()
-        ) { Text("Back up all app data") }
+        ) { Text(tr("Back up all app data")) }
         exportMessage?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
 
         AppOutlinedButton(
@@ -565,15 +570,15 @@ internal fun ReviewScreen(matchId: Long, vm: MainViewModel, nav: NavHostControll
                 contentColor = MaterialTheme.colorScheme.error
             ),
             modifier = Modifier.fillMaxWidth()
-        ) { Text("Delete match and recorded clips") }
+        ) { Text(tr("Delete match and recorded clips")) }
         if (recordingThisMatch) {
             Text(
-                "A camera recording for this match is still running or being saved. Stop it before deleting the match.",
+                tr("A camera recording for this match is still running or being saved. Stop it before deleting the match."),
                 style = MaterialTheme.typography.bodySmall
             )
         } else if (current.status in setOf(MatchStatus.LIVE, MatchStatus.PAUSED)) {
             Text(
-                "Finish or pause/end the active match before deleting it.",
+                tr("Finish or pause/end the active match before deleting it."),
                 style = MaterialTheme.typography.bodySmall
             )
         }
@@ -584,11 +589,11 @@ internal fun ReviewScreen(matchId: Long, vm: MainViewModel, nav: NavHostControll
     if (showDeleteMatch) {
         AlertDialog(
             onDismissRequest = { showDeleteMatch = false },
-            title = { Text("Permanently delete match?") },
+            title = { Text(tr("Permanently delete match?")) },
             text = {
                 Text(
-                    "This removes the match, timeline, player-minute history and ${recordings.count { it.uri != null }} recorded clip(s). " +
-                        "This cannot be undone. Imported videos are not deleted."
+                    tr("This removes the match, timeline, player-minute history and {clips} recorded clip(s). ", "clips" to (recordings.count { it.uri != null })) +
+                        tr("This cannot be undone. Imported videos are not deleted.")
                 )
             },
             confirmButton = {
@@ -607,10 +612,10 @@ internal fun ReviewScreen(matchId: Long, vm: MainViewModel, nav: NavHostControll
                     colors = ButtonDefaults.textButtonColors(
                         contentColor = MaterialTheme.colorScheme.error
                     )
-                ) { Text("Delete permanently") }
+                ) { Text(tr("Delete permanently")) }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteMatch = false }) { Text("Cancel") }
+                TextButton(onClick = { showDeleteMatch = false }) { Text(tr("Cancel")) }
             }
         )
     }
@@ -618,22 +623,22 @@ internal fun ReviewScreen(matchId: Long, vm: MainViewModel, nav: NavHostControll
     pendingEventDeletion?.let { event ->
         AlertDialog(
             onDismissRequest = { pendingEventDeletion = null },
-            title = { Text("Delete ${event.type.lowercase().replace('_', ' ')}?") },
+            title = { Text(tr("Delete {event}?", "event" to (event.type.lowercase().replace('_', ' ')))) },
             text = {
                 Text(
                     if (event.type == "OUR_GOAL" || event.type == "OPPONENT_GOAL")
-                        "The event is removed from the timeline and the score is updated."
-                    else "The event is removed from the timeline."
+                        tr("The event is removed from the timeline and the score is updated.")
+                    else tr("The event is removed from the timeline.")
                 )
             },
             confirmButton = {
                 TextButton(onClick = {
                     vm.deleteEvent(event)
                     pendingEventDeletion = null
-                }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
+                }) { Text(tr("Delete"), color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
-                TextButton(onClick = { pendingEventDeletion = null }) { Text("Cancel") }
+                TextButton(onClick = { pendingEventDeletion = null }) { Text(tr("Cancel")) }
             }
         )
     }
@@ -652,8 +657,8 @@ internal fun ReviewScreen(matchId: Long, vm: MainViewModel, nav: NavHostControll
 
     goalPositionEvent?.let { event ->
         GoalPlacementDialog(
-            title = if (event.type == "OPPONENT_GOAL") "Where did ${current.opponent} score?"
-            else "Where did ${team?.name ?: "your team"} score?",
+            title = if (event.type == "OPPONENT_GOAL") tr("Where did {opponent} score?", "opponent" to current.opponent)
+            else tr("Where did {teamName} score?", "teamName" to (team?.name ?: tr("your team"))),
             initialX = event.goalX,
             initialY = event.goalY,
             onSkip = { goalPositionEvent = null },
@@ -666,8 +671,8 @@ internal fun ReviewScreen(matchId: Long, vm: MainViewModel, nav: NavHostControll
 
     if (showFullVideo) {
         MatchVideoDialog(
-            title = if (current.isHome) "${team?.name ?: "Home"} vs ${current.opponent}"
-            else "${current.opponent} vs ${team?.name ?: "Away"}",
+            title = if (current.isHome) tr("{teamName} vs {opponent}", "teamName" to (team?.name ?: tr("Home")), "opponent" to current.opponent)
+            else tr("{opponent} vs {teamName}", "opponent" to current.opponent, "teamName" to (team?.name ?: tr("Away"))),
             recordings = recordings,
             periods = periods,
             events = events,
@@ -738,55 +743,55 @@ internal fun HighlightsCard(
             }.onSuccess {
                 reel = it
                 message = buildString {
-                    append("${formatTime(it.durationMs)} video saved")
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) append(" to Movies/MatchReview")
-                    if (it.skipped > 0) append(". ${it.skipped} clip(s) recorded with other settings were left out")
+                    append(tr("{time} video saved", "time" to (formatTime(it.durationMs))))
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) append(tr(" to Movies/MatchReview"))
+                    if (it.skipped > 0) append(tr(". {skipped} clip(s) recorded with other settings were left out", "skipped" to it.skipped))
                 }
             }.onFailure {
-                message = "Video failed: ${it.message ?: "unknown error"}"
+                message = tr("Video failed: {message}", "message" to (it.message ?: tr("unknown error")))
             }
             progress = null
         }
     }
     AppCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text("Highlights and video files", style = MaterialTheme.typography.titleMedium)
+            Text(tr("Highlights and video files"), style = MaterialTheme.typography.titleMedium)
             if (matchClips.isEmpty()) {
                 Text(
-                    "Record the match with the camera in the live screen to make highlight videos.",
+                    tr("Record the match with the camera in the live screen to make highlight videos."),
                     style = MaterialTheme.typography.bodySmall
                 )
                 return@Column
             }
             Text(
-                "Joins about ${HighlightRules.BEFORE_MS / 1000} s before and ${HighlightRules.AFTER_MS / 1000} s after " +
-                    "each recorded moment into one video, saved in Movies/MatchReview.",
+                tr("Joins about {before} s before and {after} s after ", "before" to (HighlightRules.BEFORE_MS / 1000), "after" to (HighlightRules.AFTER_MS / 1000)) +
+                    tr("each recorded moment into one video, saved in Movies/MatchReview."),
                 style = MaterialTheme.typography.bodySmall
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 AppTonalButton(
-                    onClick = { make(ourClips, "our-goals", "Goals vs ${match.opponent}") },
+                    onClick = { make(ourClips, "our-goals", tr("Goals vs {opponent}", "opponent" to match.opponent)) },
                     enabled = progress == null && ourClips.isNotEmpty(),
                     modifier = Modifier.weight(1f).heightIn(min = 48.dp)
-                ) { Text("Our goals (${ourClips.sumOf { it.eventIds.size }})") }
+                ) { Text(tr("Our goals ({count})", "count" to (ourClips.sumOf { it.eventIds.size }))) }
                 AppOutlinedButton(
-                    onClick = { make(allClips, "goals", "All goals vs ${match.opponent}") },
+                    onClick = { make(allClips, "goals", tr("All goals vs {opponent}", "opponent" to match.opponent)) },
                     enabled = progress == null && allClips.isNotEmpty(),
                     modifier = Modifier.weight(1f).heightIn(min = 48.dp)
-                ) { Text("All goals (${allClips.sumOf { it.eventIds.size }})") }
+                ) { Text(tr("All goals ({count})", "count" to (allClips.sumOf { it.eventIds.size }))) }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 AppOutlinedButton(
-                    onClick = { make(markClips, "marked", "Marked moments vs ${match.opponent}") },
+                    onClick = { make(markClips, "marked", tr("Marked moments vs {opponent}", "opponent" to match.opponent)) },
                     enabled = progress == null && markClips.isNotEmpty(),
                     modifier = Modifier.weight(1f).heightIn(min = 48.dp)
-                ) { Text("Marked (${markClips.sumOf { it.eventIds.size }})", maxLines = 1) }
+                ) { Text(tr("Marked ({count})", "count" to (markClips.sumOf { it.eventIds.size })), maxLines = 1) }
                 Box(Modifier.weight(1f)) {
                     AppOutlinedButton(
                         onClick = { playerMenu = true },
                         enabled = progress == null && playerMoments.isNotEmpty(),
                         modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
-                    ) { Text("One player…", maxLines = 1) }
+                    ) { Text(tr("One player…"), maxLines = 1) }
                     DropdownMenu(expanded = playerMenu, onDismissRequest = { playerMenu = false }) {
                         playerMoments.entries
                             .sortedBy { playersById[it.key]?.name.orEmpty() }
@@ -799,7 +804,7 @@ internal fun HighlightsCard(
                                         make(
                                             HighlightRules.playerClips(events, recordings, playerId),
                                             name,
-                                            "$name vs ${match.opponent}"
+                                            tr("{player} vs {opponent}", "player" to name, "opponent" to match.opponent)
                                         )
                                     }
                                 )
@@ -808,24 +813,24 @@ internal fun HighlightsCard(
                 }
             }
             AppOutlinedButton(
-                onClick = { make(HighlightRules.fullMatch(matchClips), "full-match", "Full match vs ${match.opponent}") },
+                onClick = { make(HighlightRules.fullMatch(matchClips), "full-match", tr("Full match vs {opponent}", "opponent" to match.opponent)) },
                 enabled = progress == null,
                 modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
-            ) { Text("Save the full match as one video") }
+            ) { Text(tr("Save the full match as one video")) }
             progress?.let { LinearProgressIndicator(progress = { it }, modifier = Modifier.fillMaxWidth()) }
             message?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
             reel?.let { saved ->
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     AppButton(
                         onClick = {
-                            if (!ExternalApps.open(context, saved.uri, "video/mp4")) message = "Install a video player to watch it."
+                            if (!ExternalApps.open(context, saved.uri, "video/mp4")) message = tr("Install a video player to watch it.")
                         },
                         modifier = Modifier.weight(1f).heightIn(min = 48.dp)
-                    ) { Text("Play") }
+                    ) { Text(tr("Play")) }
                     AppOutlinedButton(
                         onClick = { ExternalApps.share(context, saved.uri, "video/mp4", reelTitle) },
                         modifier = Modifier.weight(1f).heightIn(min = 48.dp)
-                    ) { Text("Share") }
+                    ) { Text(tr("Share")) }
                 }
             }
         }
@@ -833,18 +838,18 @@ internal fun HighlightsCard(
 }
 
 internal fun reviewEventLabel(type: String): String = MatchActions.label(type)
-    ?.let { if (MatchActions.isOpponent(type)) "Opponent ${it.lowercase()}" else it }
+    ?.let { if (MatchActions.isOpponent(type)) tr("Opponent {value}", "value" to (it.lowercase())) else it }
     ?: when (type) {
-    "OUR_GOAL" -> "Our goal"
-    "OPPONENT_GOAL" -> "Opponent goal"
-    "SUBSTITUTION" -> "Substitution"
-    "KICK_OFF" -> "Kick-off"
-    "KEEPER_SAVE" -> "Keeper save"
-    "POSITION_CHANGE" -> "Positions changed"
-    "PLAYER_ON" -> "Player on"
-    "PLAYER_OFF" -> "Player off"
-    "INJURY_OFF" -> "Injury"
-    "DISMISSAL" -> "Red card (sent off)"
+    "OUR_GOAL" -> tr("Our goal")
+    "OPPONENT_GOAL" -> tr("Opponent goal")
+    "SUBSTITUTION" -> tr("Substitution")
+    "KICK_OFF" -> tr("Kick-off")
+    "KEEPER_SAVE" -> tr("Keeper save")
+    "POSITION_CHANGE" -> tr("Positions changed")
+    "PLAYER_ON" -> tr("Player on")
+    "PLAYER_OFF" -> tr("Player off")
+    "INJURY_OFF" -> tr("Injury")
+    "DISMISSAL" -> tr("Red card (sent off)")
     else -> type.lowercase().replace('_', ' ').replaceFirstChar { it.uppercase() }
 }
 
@@ -855,6 +860,7 @@ internal fun EventDialog(
     onDismiss: () -> Unit,
     onSave: (Long?, String, String, String) -> Unit
 ) {
+    // Saved in English with the tag and translated when shown.
     val types = listOf("Goal", "Shot", "Chance", "Pass", "Cross", "Corner", "Free kick", "Foul", "Save", "Turnover", "Pressing", "Defensive error", "Set piece", "Custom")
     var type by remember { mutableStateOf("Chance") }
     var sentiment by remember { mutableStateOf("Neutral") }
@@ -865,23 +871,23 @@ internal fun EventDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Tag ${formatTime(timestamp)}") },
+        title = { Text(tr("Tag {time}", "time" to (formatTime(timestamp)))) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Box {
-                    AppOutlinedButton(onClick = { typeMenu = true }, modifier = Modifier.fillMaxWidth()) { Text(type) }
+                    AppOutlinedButton(onClick = { typeMenu = true }, modifier = Modifier.fillMaxWidth()) { Text(tr(type)) }
                     DropdownMenu(typeMenu, { typeMenu = false }) {
                         types.forEach { item ->
-                            DropdownMenuItem(text = { Text(item) }, onClick = { type = item; typeMenu = false })
+                            DropdownMenuItem(text = { Text(tr(item)) }, onClick = { type = item; typeMenu = false })
                         }
                     }
                 }
                 Box {
                     AppOutlinedButton(onClick = { playerMenu = true }, modifier = Modifier.fillMaxWidth()) {
-                        Text(players.firstOrNull { it.id == playerId }?.name ?: "No player")
+                        Text(players.firstOrNull { it.id == playerId }?.name ?: tr("No player"))
                     }
                     DropdownMenu(playerMenu, { playerMenu = false }) {
-                        DropdownMenuItem(text = { Text("No player") }, onClick = { playerId = null; playerMenu = false })
+                        DropdownMenuItem(text = { Text(tr("No player")) }, onClick = { playerId = null; playerMenu = false })
                         players.forEach { item ->
                             DropdownMenuItem(text = { Text(item.name) }, onClick = { playerId = item.id; playerMenu = false })
                         }
@@ -889,15 +895,15 @@ internal fun EventDialog(
                 }
                 Row {
                     listOf("Positive", "Neutral", "Improve").forEach {
-                        FilterChip(selected = sentiment == it, onClick = { sentiment = it }, label = { Text(it) })
+                        FilterChip(selected = sentiment == it, onClick = { sentiment = it }, label = { Text(tr(it)) })
                         Spacer(Modifier.width(4.dp))
                     }
                 }
-                Field(note, { note = it }, "Note")
+                Field(note, { note = it }, tr("Note"))
             }
         },
-        confirmButton = { TextButton(onClick = { onSave(playerId, type, sentiment, note) }) { Text("Save tag") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+        confirmButton = { TextButton(onClick = { onSave(playerId, type, sentiment, note) }) { Text(tr("Save tag")) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(tr("Cancel")) } }
     )
 }
 
@@ -921,20 +927,20 @@ internal fun ReviewEditor(match: GameMatch, vm: MainViewModel) {
     }
 
     HorizontalDivider()
-    Text("Match summary", style = MaterialTheme.typography.titleLarge)
+    Text(tr("Match summary"), style = MaterialTheme.typography.titleLarge)
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Field(ourScore, { ourScore = it.filter(Char::isDigit).take(2); scoreEdited = true; saved = false }, "Our score", Modifier.weight(1f))
-        Field(theirScore, { theirScore = it.filter(Char::isDigit).take(2); scoreEdited = true; saved = false }, "Opponent", Modifier.weight(1f))
-        Field(rating, { rating = it.filter(Char::isDigit).take(2); saved = false }, "Rating /10", Modifier.weight(1f))
+        Field(ourScore, { ourScore = it.filter(Char::isDigit).take(2); scoreEdited = true; saved = false }, tr("Our score"), Modifier.weight(1f))
+        Field(theirScore, { theirScore = it.filter(Char::isDigit).take(2); scoreEdited = true; saved = false }, tr("Opponent"), Modifier.weight(1f))
+        Field(rating, { rating = it.filter(Char::isDigit).take(2); saved = false }, tr("Rating /10"), Modifier.weight(1f))
     }
     Text(
-        "The score follows the goals on the timeline. Changing it here adds or removes goal events.",
+        tr("The score follows the goals on the timeline. Changing it here adds or removes goal events."),
         style = MaterialTheme.typography.bodySmall
     )
     OutlinedTextField(
         value = notes,
         onValueChange = { notes = it; saved = false },
-        label = { Text("What went well, improvements, next training focus") },
+        label = { Text(tr("What went well, improvements, next training focus")) },
         minLines = 4,
         modifier = Modifier.fillMaxWidth()
     )
@@ -954,7 +960,7 @@ internal fun ReviewEditor(match: GameMatch, vm: MainViewModel) {
         },
         enabled = !saving,
         modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
-    ) { Text(if (saving) "Saving…" else if (saved) "Saved" else "Save review") }
+    ) { Text(if (saving) tr("Saving…") else if (saved) tr("Saved") else tr("Save review")) }
 }
 
 /** A scrolling form; the screen title is already in the top bar. */

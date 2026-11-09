@@ -1,5 +1,7 @@
 package be.matchreview.app.recording
 
+import be.matchreview.app.i18n.tr
+
 import android.Manifest
 import android.content.Context
 import android.content.Intent
@@ -154,7 +156,7 @@ fun CameraMatchPanel(
             permissionMessage = null
             if (pendingStart) startRecording()
         } else {
-            permissionMessage = "Camera permission is required (and storage on Android 9 and older). Microphone permission is only required when audio is enabled."
+            permissionMessage = tr("Camera permission is required (and storage on Android 9 and older). Microphone permission is only required when audio is enabled.")
         }
         pendingStart = false
     }
@@ -201,7 +203,7 @@ fun CameraMatchPanel(
             is CameraRecordingState.Recording -> MatchRecordingService.requestStop(context, matchClockMs)
             is CameraRecordingState.Idle, is CameraRecordingState.Error -> {
                 if (!storageHealth.canStartRecording) {
-                    permissionMessage = "Not enough free storage to start a safe recording."
+                    permissionMessage = tr("Not enough free storage to start a safe recording.")
                 } else if (hasRequiredPermissions()) {
                     startRecording()
                 } else {
@@ -250,11 +252,11 @@ fun CameraMatchPanel(
             OverlayPill(
                 text = when (state) {
                     is CameraRecordingState.Recording ->
-                        "● REC ${MatchClockCalculator.formatClock(now - recordingState!!.startedAtElapsedRealtimeMs)}"
-                    is CameraRecordingState.Preparing -> "Starting…"
-                    is CameraRecordingState.Finalizing -> "Saving…"
-                    is CameraRecordingState.Error -> "Camera problem"
-                    CameraRecordingState.Idle -> if (cameraPermissionGranted) "Ready" else "Camera off"
+                        tr("● REC {time}", "time" to (MatchClockCalculator.formatClock(now - recordingState!!.startedAtElapsedRealtimeMs)))
+                    is CameraRecordingState.Preparing -> tr("Starting…")
+                    is CameraRecordingState.Finalizing -> tr("Saving…")
+                    is CameraRecordingState.Error -> tr("Camera problem")
+                    CameraRecordingState.Idle -> if (cameraPermissionGranted) tr("Ready") else tr("Camera off")
                 },
                 background = if (recording) Color(0xE6B00020) else Color(0x99000000),
                 modifier = Modifier.align(Alignment.TopStart).padding(10.dp)
@@ -269,8 +271,8 @@ fun CameraMatchPanel(
 
             val centerMessage = when {
                 state is CameraRecordingState.Error -> (state as CameraRecordingState.Error).message
-                recordingOtherMatch -> "The camera is recording another match. Stop it from the notification first."
-                !cameraPermissionGranted -> "Tap the record button to allow the camera."
+                recordingOtherMatch -> tr("The camera is recording another match. Stop it from the notification first.")
+                !cameraPermissionGranted -> tr("Tap the record button to allow the camera.")
                 else -> null
             }
             centerMessage?.let {
@@ -290,7 +292,7 @@ fun CameraMatchPanel(
             val micButton: @Composable () -> Unit = {
                 OverlayIconButton(
                     icon = if (audioEnabled) Icons.Filled.Mic else Icons.Filled.MicOff,
-                    description = if (audioEnabled) "Record without sound" else "Record with sound",
+                    description = if (audioEnabled) tr("Record without sound") else tr("Record with sound"),
                     enabled = cameraIdle,
                     onClick = { audioEnabled = !audioEnabled }
                 )
@@ -298,7 +300,7 @@ fun CameraMatchPanel(
             val lensButton: @Composable () -> Unit = {
                 OverlayIconButton(
                     icon = Icons.Filled.Cameraswitch,
-                    description = "Switch camera",
+                    description = tr("Switch camera"),
                     enabled = cameraIdle,
                     onClick = {
                         CameraRecordingController.chooseLens(
@@ -310,7 +312,7 @@ fun CameraMatchPanel(
             val torchButton: @Composable () -> Unit = {
                 OverlayIconButton(
                     icon = if (torch) Icons.Filled.FlashOn else Icons.Filled.FlashOff,
-                    description = if (torch) "Turn torch off" else "Turn torch on",
+                    description = if (torch) tr("Turn torch off") else tr("Turn torch on"),
                     enabled = lens == CameraLens.BACK &&
                         (state is CameraRecordingState.Recording || state is CameraRecordingState.Preparing),
                     onClick = { CameraRecordingController.setTorch(!torch) }
@@ -319,7 +321,7 @@ fun CameraMatchPanel(
             val markButton: @Composable () -> Unit = {
                 OverlayIconButton(
                     icon = Icons.Filled.BookmarkAdd,
-                    description = "Mark this moment in the video",
+                    description = tr("Mark this moment in the video"),
                     enabled = recording,
                     onClick = onMarkMoment
                 )
@@ -375,14 +377,14 @@ fun CameraMatchPanel(
             Text(
                 listOfNotNull(
                     when (saved.size) {
-                        0 -> "No clips yet"
-                        1 -> "1 clip"
-                        else -> "${saved.size} clips"
+                        0 -> tr("No clips yet")
+                        1 -> tr("1 clip")
+                        else -> tr("{savedCount} clips", "savedCount" to saved.size)
                     } + saved.sumOf { it.recordingDurationMs }.takeIf { it > 0 }
                         ?.let { " • ${MatchClockCalculator.formatClock(it)}" }.orEmpty(),
-                    "$failed failed".takeIf { failed > 0 },
+                    tr("{failed} failed", "failed" to failed).takeIf { failed > 0 },
                     if (storageProblem) budget.message
-                    else "${StorageHealthRules.formatAvailable(storageHealth.availableBytes)} free"
+                    else tr("{availableBytes} free", "availableBytes" to (StorageHealthRules.formatAvailable(storageHealth.availableBytes)))
                 ).joinToString("  •  "),
                 style = MaterialTheme.typography.labelMedium,
                 color = if (storageProblem || failed > 0) MaterialTheme.colorScheme.error
@@ -399,11 +401,11 @@ fun CameraMatchPanel(
                     onClick = { open = true },
                     contentPadding = PaddingValues(horizontal = 8.dp),
                     modifier = Modifier.semantics {
-                        contentDescription = "Stop filming: ${stopMode.label}. Tap to change"
+                        contentDescription = tr("Stop filming: {stopModeLabel}. Tap to change", "stopModeLabel" to stopMode.label)
                     }
                 ) {
                     Text(
-                        if (compact) "Stop: ${stopMode.shortLabel} ▾" else "Stop filming: ${stopMode.shortLabel} ▾",
+                        if (compact) tr("Stop: {shortLabel} ▾", "shortLabel" to stopMode.shortLabel) else tr("Stop filming: {shortLabel} ▾", "shortLabel" to stopMode.shortLabel),
                         maxLines = 1
                     )
                 }
@@ -414,7 +416,7 @@ fun CameraMatchPanel(
                                 Column {
                                     Text(mode.label, fontWeight = if (mode == stopMode) FontWeight.Bold else null)
                                     if (mode.followsPeriods) {
-                                        Text("Records again when the next period starts", style = MaterialTheme.typography.bodySmall)
+                                        Text(tr("Records again when the next period starts"), style = MaterialTheme.typography.bodySmall)
                                     }
                                 }
                             },
@@ -436,7 +438,7 @@ fun CameraMatchPanel(
         ) {
             clipSummary(Modifier.weight(1f))
             if (hasSavedClips) TextButton(onClick = onWatchVideo, contentPadding = PaddingValues(horizontal = 8.dp)) {
-                Text(if (landscape) "Watch" else "Watch video")
+                Text(if (landscape) tr("Watch") else tr("Watch video"))
             }
             if (landscape) stopModeMenu(true)
         }
@@ -460,7 +462,7 @@ fun CameraMatchPanel(
                                 Uri.parse("package:${context.packageName}")
                             )
                         )
-                    }) { Text("Settings") }
+                    }) { Text(tr("Settings")) }
                 }
             }
         }
@@ -509,7 +511,7 @@ private fun RecordButton(recording: Boolean, enabled: Boolean, onClick: () -> Un
             .clip(CircleShape)
             .border(4.dp, Color.White.copy(alpha = if (enabled) 1f else 0.4f), CircleShape)
             .clickable(enabled = enabled, onClick = onClick)
-            .semantics { contentDescription = if (recording) "Stop and save recording" else "Start recording" },
+            .semantics { contentDescription = if (recording) tr("Stop and save recording") else tr("Start recording") },
         contentAlignment = Alignment.Center
     ) {
         Box(

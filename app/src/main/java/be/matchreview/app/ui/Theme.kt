@@ -1,5 +1,7 @@
 package be.matchreview.app.ui
 
+import be.matchreview.app.i18n.tr
+
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -10,11 +12,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
 /** How the app looks; Outdoor is a high-contrast light scheme for bright sunlight. */
-enum class ThemeMode(val label: String) {
+enum class ThemeMode(private val englishLabel: String) {
     SYSTEM("System"),
     LIGHT("Light"),
     DARK("Dark"),
     OUTDOOR("Outdoor");
+
+    /** Looked up when shown, so it follows a change of language. */
+    val label: String get() = tr(englishLabel)
 
     companion object {
         fun fromName(name: String?): ThemeMode = entries.firstOrNull { it.name == name } ?: SYSTEM

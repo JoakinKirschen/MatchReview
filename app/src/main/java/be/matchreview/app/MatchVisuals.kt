@@ -1,5 +1,7 @@
 package be.matchreview.app
 
+import be.matchreview.app.i18n.tr
+
 import be.matchreview.app.ui.AppCard
 import be.matchreview.app.ui.AppOutlinedButton
 import androidx.compose.foundation.Canvas
@@ -66,7 +68,7 @@ fun LineupSnapshotPitch(
             .clip(RoundedCornerShape(12.dp))
             .background(PitchColors.grass)
             .semantics {
-                contentDescription = "Lineup after the change: " +
+                contentDescription = tr("Lineup after the change: ") +
                     positions.joinToString { playersById[it.playerId]?.name ?: "player" }
             }
     ) {
@@ -122,20 +124,20 @@ fun LineupChangeCard(
     modifier: Modifier = Modifier,
     trailing: @Composable () -> Unit = {}
 ) {
-    fun names(ids: List<Long>) = ids.joinToString(", ") { playersById[it]?.name ?: "Player" }
+    fun names(ids: List<Long>) = ids.joinToString(", ") { playersById[it]?.name ?: tr("Player") }
     val title = when {
-        change.isStartingLineup -> if (change.isApproximate) "Starting lineup (approximate)" else "Starting lineup"
-        change.events.all { it.type == "POSITION_CHANGE" } -> "Positions changed"
-        change.events.any { it.type == "DISMISSAL" } -> "Dismissal"
-        change.events.any { it.type == "INJURY_OFF" } -> "Injury"
-        else -> "Substitution" + if (change.events.size > 1) "s" else ""
+        change.isStartingLineup -> if (change.isApproximate) tr("Starting lineup (approximate)") else tr("Starting lineup")
+        change.events.all { it.type == "POSITION_CHANGE" } -> tr("Positions changed")
+        change.events.any { it.type == "DISMISSAL" } -> tr("Dismissal")
+        change.events.any { it.type == "INJURY_OFF" } -> tr("Injury")
+        else -> tr("Substitution") + if (change.events.size > 1) "s" else ""
     }
     AppCard(modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer) {
                     Text(
-                        if (change.isStartingLineup) "Start" else MatchClockCalculator.formatClock(change.timestampMs),
+                        if (change.isStartingLineup) tr("Start") else MatchClockCalculator.formatClock(change.timestampMs),
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                         fontWeight = FontWeight.Bold
                     )
@@ -144,10 +146,10 @@ fun LineupChangeCard(
                 Column(Modifier.weight(1f)) {
                     Text(title, fontWeight = FontWeight.Bold)
                     if (change.incomingPlayerIds.isNotEmpty()) {
-                        Text("▲ On: ${names(change.incomingPlayerIds)}", style = MaterialTheme.typography.bodySmall)
+                        Text(tr("▲ On: {incomingPlayerIds}", "incomingPlayerIds" to (names(change.incomingPlayerIds))), style = MaterialTheme.typography.bodySmall)
                     }
                     if (change.outgoingPlayerIds.isNotEmpty()) {
-                        Text("▼ Off: ${names(change.outgoingPlayerIds)}", style = MaterialTheme.typography.bodySmall)
+                        Text(tr("▼ Off: {outgoingPlayerIds}", "outgoingPlayerIds" to (names(change.outgoingPlayerIds))), style = MaterialTheme.typography.bodySmall)
                     }
                 }
                 trailing()
@@ -208,7 +210,7 @@ fun GoalPlacementDialog(
         title = { Text(title) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Tap where the ball entered the goal.", style = MaterialTheme.typography.bodySmall)
+                Text(tr("Tap where the ball entered the goal."), style = MaterialTheme.typography.bodySmall)
                 Canvas(
                     Modifier
                         .fillMaxWidth()
@@ -220,14 +222,14 @@ fun GoalPlacementDialog(
                                 )
                             }
                         }
-                        .semantics { contentDescription = "Goal mouth. Tap to place the ball." }
+                        .semantics { contentDescription = tr("Goal mouth. Tap to place the ball.") }
                 ) {
                     drawGoalFrame()
                     point?.let { (x, y) -> drawBall(x, y, Color(0xFF212121), size.height * 0.07f) }
                 }
                 Text(
                     point?.let { GoalMouthGeometry.describe(it.first, it.second) }
-                        ?.replaceFirstChar { it.uppercase() } ?: "No position selected",
+                        ?.replaceFirstChar { it.uppercase() } ?: tr("No position selected"),
                     style = MaterialTheme.typography.labelMedium
                 )
             }
@@ -236,9 +238,9 @@ fun GoalPlacementDialog(
             TextButton(
                 enabled = point != null,
                 onClick = { point?.let { onSave(it.first, it.second) } }
-            ) { Text("Save position") }
+            ) { Text(tr("Save position")) }
         },
-        dismissButton = { TextButton(onClick = onSkip) { Text("Skip") } }
+        dismissButton = { TextButton(onClick = onSkip) { Text(tr("Skip")) } }
     )
 }
 
@@ -249,10 +251,10 @@ fun GoalMap(events: List<MatchEvent>, opponentName: String, modifier: Modifier =
         (it.type == "OUR_GOAL" || it.type == "OPPONENT_GOAL") && it.goalX != null && it.goalY != null
     }
     Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text("Goal map", style = MaterialTheme.typography.titleMedium)
+        Text(tr("Goal map"), style = MaterialTheme.typography.titleMedium)
         if (placed.isEmpty()) {
             Text(
-                "No goal positions recorded. Add them while recording a goal or from the goal editor.",
+                tr("No goal positions recorded. Add them while recording a goal or from the goal editor."),
                 style = MaterialTheme.typography.bodySmall
             )
             return@Column
@@ -261,7 +263,7 @@ fun GoalMap(events: List<MatchEvent>, opponentName: String, modifier: Modifier =
             Modifier
                 .fillMaxWidth()
                 .aspectRatio(GoalMouthGeometry.ASPECT_RATIO)
-                .semantics { contentDescription = "${placed.size} goals placed on the goal map" }
+                .semantics { contentDescription = tr("{placedCount} goals placed on the goal map", "placedCount" to placed.size) }
         ) {
             drawGoalFrame()
             placed.forEach {
@@ -273,7 +275,7 @@ fun GoalMap(events: List<MatchEvent>, opponentName: String, modifier: Modifier =
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            LegendDot(OurGoalColor, "Our goals (${placed.count { it.type == "OUR_GOAL" }})")
+            LegendDot(OurGoalColor, tr("Our goals ({count})", "count" to (placed.count { it.type == "OUR_GOAL" })))
             LegendDot(OpponentGoalColor, "$opponentName (${placed.count { it.type == "OPPONENT_GOAL" }})")
         }
     }
@@ -294,13 +296,13 @@ fun HomeAwaySelector(home: Boolean, onChange: (Boolean) -> Unit, modifier: Modif
         FilterChip(
             selected = home,
             onClick = { onChange(true) },
-            label = { Text("Home") },
+            label = { Text(tr("Home")) },
             modifier = Modifier.heightIn(min = 48.dp)
         )
         FilterChip(
             selected = !home,
             onClick = { onChange(false) },
-            label = { Text("Away") },
+            label = { Text(tr("Away")) },
             modifier = Modifier.heightIn(min = 48.dp)
         )
     }
@@ -311,7 +313,7 @@ fun TeamLogoImage(logoPng: String?, size: Dp, modifier: Modifier = Modifier) {
     val bitmap = remember(logoPng) { TeamLogoCodec.decode(logoPng)?.asImageBitmap() } ?: return
     Image(
         bitmap = bitmap,
-        contentDescription = "Team logo",
+        contentDescription = tr("Team logo"),
         contentScale = ContentScale.Fit,
         modifier = modifier.size(size)
     )
@@ -334,7 +336,7 @@ fun MatchDetailsDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Edit match details") },
+        title = { Text(tr("Edit match details")) },
         text = {
             Column(
                 Modifier.verticalScroll(rememberScrollState()),
@@ -344,7 +346,7 @@ fun MatchDetailsDialog(
                 OutlinedTextField(
                     value = opponent,
                     onValueChange = { opponent = it },
-                    label = { Text("Opponent") },
+                    label = { Text(tr("Opponent")) },
                     singleLine = true,
                     isError = opponent.isBlank(),
                     modifier = Modifier.fillMaxWidth()
@@ -354,21 +356,21 @@ fun MatchDetailsDialog(
                     modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
                 ) {
                     Column(Modifier.fillMaxWidth()) {
-                        Text("Match date", style = MaterialTheme.typography.labelSmall)
+                        Text(tr("Match date"), style = MaterialTheme.typography.labelSmall)
                         Text(date)
                     }
                 }
                 OutlinedTextField(
                     value = venue,
                     onValueChange = { venue = it },
-                    label = { Text("Venue") },
+                    label = { Text(tr("Venue")) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
                 OutlinedTextField(
                     value = competition,
                     onValueChange = { competition = it },
-                    label = { Text("Competition") },
+                    label = { Text(tr("Competition")) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -378,9 +380,9 @@ fun MatchDetailsDialog(
             TextButton(
                 enabled = opponent.isNotBlank() && date.isNotBlank(),
                 onClick = { onSave(opponent, date, venue, competition, home) }
-            ) { Text("Save details") }
+            ) { Text(tr("Save details")) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text(tr("Cancel")) } }
     )
 
     if (showDatePicker) {
@@ -409,9 +411,9 @@ fun MatchDatePickerDialog(date: String, onDismiss: () -> Unit, onPicked: (String
         confirmButton = {
             TextButton(onClick = {
                 state.selectedDateMillis?.let { onPicked(utcFormat.format(Date(it))) } ?: onDismiss()
-            }) { Text("Use date") }
+            }) { Text(tr("Use date")) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text(tr("Cancel")) } }
     ) {
         DatePicker(state = state)
     }

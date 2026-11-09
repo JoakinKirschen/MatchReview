@@ -1,5 +1,7 @@
 package be.matchreview.app
 
+import be.matchreview.app.i18n.tr
+
 import be.matchreview.app.ui.AppCard
 import be.matchreview.app.ui.AppButton
 import be.matchreview.app.ui.AppOutlinedButton
@@ -63,21 +65,21 @@ internal fun MatchesScreen(vm: MainViewModel, nav: NavHostController) {
     ) {
         item {
             AppButton(onClick = { nav.navigate("match/new") }, modifier = Modifier.fillMaxWidth()) {
-                Text("New match")
+                Text(tr("New match"))
             }
         }
         item {
             OutlinedTextField(
                 value = search,
                 onValueChange = { search = it },
-                label = { Text("Search matches") },
+                label = { Text(tr("Search matches")) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
         }
         item {
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(listOf("ALL" to "All", "ACTIVE" to "Active", "DRAFT" to "Drafts", "FINISHED" to "Finished")) {
+                items(listOf("ALL" to tr("All"), "ACTIVE" to tr("Active"), "DRAFT" to tr("Drafts"), "FINISHED" to tr("Finished"))) {
                     FilterChip(
                         selected = statusFilter == it.first,
                         onClick = { statusFilter = it.first },
@@ -86,10 +88,10 @@ internal fun MatchesScreen(vm: MainViewModel, nav: NavHostController) {
                 }
             }
         }
-        if (matches.isEmpty()) item { EmptyCard("No matches yet.") }
-        else if (visibleMatches.isEmpty()) item { EmptyCard("No matches match these filters.") }
+        if (matches.isEmpty()) item { EmptyCard(tr("No matches yet.")) }
+        else if (visibleMatches.isEmpty()) item { EmptyCard(tr("No matches match these filters.")) }
         items(visibleMatches, key = { it.id }) { match ->
-            MatchCard(match, teams.firstOrNull { it.id == match.teamId }?.name ?: "Team") {
+            MatchCard(match, teams.firstOrNull { it.id == match.teamId }?.name ?: tr("Team")) {
                 nav.navigate(matchDestination(match))
             }
         }
@@ -108,15 +110,15 @@ internal fun matchDestination(match: GameMatch): String = when (match.status) {
 }
 
 internal fun matchNextAction(match: GameMatch): String = when (match.status) {
-    MatchStatus.DRAFT -> "Continue squad setup"
-    MatchStatus.LINEUP_READY -> "Open match day"
-    MatchStatus.LIVE -> "Resume live match"
-    MatchStatus.PAUSED -> "Resume paused match"
+    MatchStatus.DRAFT -> tr("Continue squad setup")
+    MatchStatus.LINEUP_READY -> tr("Open match day")
+    MatchStatus.LIVE -> tr("Resume live match")
+    MatchStatus.PAUSED -> tr("Resume paused match")
     MatchStatus.PERIOD_ENDED ->
-        if (match.currentPeriod < match.periodCount) "Start next period" else "Finish match"
-    MatchStatus.FINISHED -> "Review match"
-    MatchStatus.ABANDONED -> "Review abandoned match"
-    MatchStatus.CANCELLED -> "Review cancelled match"
+        if (match.currentPeriod < match.periodCount) tr("Start next period") else tr("Finish match")
+    MatchStatus.FINISHED -> tr("Review match")
+    MatchStatus.ABANDONED -> tr("Review abandoned match")
+    MatchStatus.CANCELLED -> tr("Review cancelled match")
 }
 
 @Composable
@@ -126,7 +128,7 @@ internal fun MatchCard(match: GameMatch, teamName: String, open: () -> Unit) {
         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
-                    "$teamName vs ${match.opponent}",
+                    tr("{teamName} vs {opponent}", "teamName" to teamName, "opponent" to match.opponent),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
@@ -161,14 +163,14 @@ internal fun MatchCard(match: GameMatch, teamName: String, open: () -> Unit) {
 @Composable
 internal fun MatchStatusBadge(status: MatchStatus) {
     val (label, color) = when (status) {
-        MatchStatus.DRAFT -> "Draft" to MaterialTheme.colorScheme.surfaceVariant
-        MatchStatus.LINEUP_READY -> "Ready" to MaterialTheme.colorScheme.tertiaryContainer
-        MatchStatus.LIVE -> "Live" to MaterialTheme.colorScheme.errorContainer
-        MatchStatus.PAUSED -> "Paused" to MaterialTheme.colorScheme.errorContainer
-        MatchStatus.PERIOD_ENDED -> "Break" to MaterialTheme.colorScheme.errorContainer
-        MatchStatus.FINISHED -> "Finished" to MaterialTheme.colorScheme.primaryContainer
-        MatchStatus.ABANDONED -> "Abandoned" to MaterialTheme.colorScheme.surfaceVariant
-        MatchStatus.CANCELLED -> "Cancelled" to MaterialTheme.colorScheme.surfaceVariant
+        MatchStatus.DRAFT -> tr("Draft") to MaterialTheme.colorScheme.surfaceVariant
+        MatchStatus.LINEUP_READY -> tr("Ready") to MaterialTheme.colorScheme.tertiaryContainer
+        MatchStatus.LIVE -> tr("Live") to MaterialTheme.colorScheme.errorContainer
+        MatchStatus.PAUSED -> tr("Paused") to MaterialTheme.colorScheme.errorContainer
+        MatchStatus.PERIOD_ENDED -> tr("Break") to MaterialTheme.colorScheme.errorContainer
+        MatchStatus.FINISHED -> tr("Finished") to MaterialTheme.colorScheme.primaryContainer
+        MatchStatus.ABANDONED -> tr("Abandoned") to MaterialTheme.colorScheme.surfaceVariant
+        MatchStatus.CANCELLED -> tr("Cancelled") to MaterialTheme.colorScheme.surfaceVariant
     }
     Surface(color = color, shape = MaterialTheme.shapes.small) {
         Text(
@@ -234,8 +236,8 @@ internal fun NewMatchScreen(vm: MainViewModel, nav: NavHostController) {
 
     FormColumn {
         if (teams.isEmpty()) {
-            EmptyCard("Create a team before adding a match.")
-            AppButton(onClick = { nav.navigate("team/new") }) { Text("Create team") }
+            EmptyCard(tr("Create a team before adding a match."))
+            AppButton(onClick = { nav.navigate("team/new") }) { Text(tr("Create team")) }
         } else {
             Row(
                 Modifier.fillMaxWidth(),
@@ -248,7 +250,7 @@ internal fun NewMatchScreen(vm: MainViewModel, nav: NavHostController) {
                         modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
                     ) {
                         Text(
-                            teams.firstOrNull { it.id == teamId }?.name ?: "Choose team",
+                            teams.firstOrNull { it.id == teamId }?.name ?: tr("Choose team"),
                             maxLines = 1,
                             overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                         )
@@ -264,19 +266,19 @@ internal fun NewMatchScreen(vm: MainViewModel, nav: NavHostController) {
                 }
                 HomeAwaySelector(home, { home = it })
             }
-            Field(opponent, { opponent = it }, "Opponent")
+            Field(opponent, { opponent = it }, tr("Opponent"))
             AppOutlinedButton(
                 onClick = { showDatePicker = true },
                 modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
             ) {
                 Column(Modifier.fillMaxWidth()) {
-                    Text("Match date", style = MaterialTheme.typography.labelSmall)
+                    Text(tr("Match date"), style = MaterialTheme.typography.labelSmall)
                     Text(date)
                 }
             }
-            Field(venue, { venue = it }, "Venue")
-            Field(competition, { competition = it }, "Competition")
-            Text("Match size", style = MaterialTheme.typography.titleMedium)
+            Field(venue, { venue = it }, tr("Venue"))
+            Field(competition, { competition = it }, tr("Competition"))
+            Text(tr("Match size"), style = MaterialTheme.typography.titleMedium)
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -298,13 +300,13 @@ internal fun NewMatchScreen(vm: MainViewModel, nav: NavHostController) {
                     }
                 }
             }
-            Text("Formation", style = MaterialTheme.typography.titleMedium)
+            Text(tr("Formation"), style = MaterialTheme.typography.titleMedium)
             Box {
                 AppOutlinedButton(
                     onClick = { formationMenu = true },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text(formation.ifBlank { "Choose formation" })
+                    Text(formation.ifBlank { tr("Choose formation") })
                 }
                 DropdownMenu(
                     expanded = formationMenu,
@@ -321,32 +323,32 @@ internal fun NewMatchScreen(vm: MainViewModel, nav: NavHostController) {
                     }
                 }
             }
-            Text("Match timing", style = MaterialTheme.typography.titleMedium)
+            Text(tr("Match timing"), style = MaterialTheme.typography.titleMedium)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Field(
                     periodCount,
                     { periodCount = it.filter(Char::isDigit).take(1) },
-                    "Periods",
+                    tr("Periods"),
                     Modifier.weight(1f)
                 )
                 Field(
                     periodDuration,
                     { periodDuration = it.filter(Char::isDigit).take(3) },
-                    "Minutes each",
+                    tr("Minutes each"),
                     Modifier.weight(1f)
                 )
             }
             Text(
-                "$selectedSize players per team",
+                tr("{selectedSize} players per team", "selectedSize" to selectedSize),
                 style = MaterialTheme.typography.bodySmall
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Switch(rollingSubstitutions, { rollingSubstitutions = it })
                 Spacer(Modifier.width(8.dp))
                 Column {
-                    Text("Rolling substitutions")
+                    Text(tr("Rolling substitutions"))
                     Text(
-                        if (rollingSubstitutions) "Players may return after substitution" else "Substituted players cannot return",
+                        if (rollingSubstitutions) tr("Players may return after substitution") else tr("Substituted players cannot return"),
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
@@ -376,7 +378,7 @@ internal fun NewMatchScreen(vm: MainViewModel, nav: NavHostController) {
                     }
                 },
                 modifier = Modifier.fillMaxWidth()
-            ) { Text("Save match setup") }
+            ) { Text(tr("Save match setup")) }
         }
     }
 

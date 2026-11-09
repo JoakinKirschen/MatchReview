@@ -1,5 +1,7 @@
 package be.matchreview.app
 
+import be.matchreview.app.i18n.tr
+
 import be.matchreview.app.ui.AppCard
 import be.matchreview.app.ui.AppButton
 import be.matchreview.app.ui.AppOutlinedButton
@@ -87,7 +89,7 @@ internal fun BackupRestoreScreen(vm: MainViewModel) {
     val passwordValid = exportPassword.length >= 6 && exportPassword == exportPasswordAgain
     val lastBackupLabel = lastBackupEpochMs?.let {
         SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault()).format(Date(it))
-    } ?: "Never backed up"
+    } ?: tr("Never backed up")
 
     Column(
         Modifier
@@ -96,9 +98,9 @@ internal fun BackupRestoreScreen(vm: MainViewModel) {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text("Encrypted backups to this phone, Google Drive or another storage app.")
+        Text(tr("Encrypted backups to this phone, Google Drive or another storage app."))
         Text(
-            "App ${BuildConfig.VERSION_NAME} • database ${AppDatabase.DATABASE_VERSION} • backup format ${be.matchreview.app.backup.MatchBackupManager.BACKUP_FORMAT_VERSION}",
+            tr("App {app} • database {database} • backup format {format}", "app" to BuildConfig.VERSION_NAME, "database" to AppDatabase.DATABASE_VERSION, "format" to be.matchreview.app.backup.MatchBackupManager.BACKUP_FORMAT_VERSION),
             style = MaterialTheme.typography.bodySmall
         )
 
@@ -107,11 +109,11 @@ internal fun BackupRestoreScreen(vm: MainViewModel) {
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("Backup status", style = MaterialTheme.typography.titleMedium)
+                Text(tr("Backup status"), style = MaterialTheme.typography.titleMedium)
                 Text(lastBackupLabel)
                 if (lastBackupEpochMs != null) {
                     Text(
-                        if (lastBackupIncludedMedia) "Last backup included videos" else "Last backup excluded videos",
+                        if (lastBackupIncludedMedia) tr("Last backup included videos") else tr("Last backup excluded videos"),
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
@@ -123,11 +125,11 @@ internal fun BackupRestoreScreen(vm: MainViewModel) {
                 Modifier.padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Text("Create backup", style = MaterialTheme.typography.titleMedium)
+                Text(tr("Create backup"), style = MaterialTheme.typography.titleMedium)
                 OutlinedTextField(
                     value = exportPassword,
                     onValueChange = { exportPassword = it },
-                    label = { Text("Password (6+ characters)") },
+                    label = { Text(tr("Password (6+ characters)")) },
                     visualTransformation = if (showExportPassword) {
                         VisualTransformation.None
                     } else {
@@ -135,7 +137,7 @@ internal fun BackupRestoreScreen(vm: MainViewModel) {
                     },
                     trailingIcon = {
                         TextButton(onClick = { showExportPassword = !showExportPassword }) {
-                            Text(if (showExportPassword) "Hide" else "Show")
+                            Text(if (showExportPassword) tr("Hide") else tr("Show"))
                         }
                     },
                     singleLine = true,
@@ -144,7 +146,7 @@ internal fun BackupRestoreScreen(vm: MainViewModel) {
                 OutlinedTextField(
                     value = exportPasswordAgain,
                     onValueChange = { exportPasswordAgain = it },
-                    label = { Text("Repeat password") },
+                    label = { Text(tr("Repeat password")) },
                     visualTransformation = if (showExportPassword) {
                         VisualTransformation.None
                     } else {
@@ -156,7 +158,7 @@ internal fun BackupRestoreScreen(vm: MainViewModel) {
                     modifier = Modifier.fillMaxWidth()
                 )
                 Text(
-                    "The password cannot be recovered by MatchReview.",
+                    tr("The password cannot be recovered by MatchReview."),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error
                 )
@@ -166,19 +168,19 @@ internal fun BackupRestoreScreen(vm: MainViewModel) {
                         onCheckedChange = { includeMedia = it }
                     )
                     Column(Modifier.weight(1f)) {
-                        Text("Include video files")
+                        Text(tr("Include video files"))
                         Text(
-                            "Much larger; only with the club's consent.",
+                            tr("Much larger; only with the club's consent."),
                             style = MaterialTheme.typography.bodySmall
                         )
                     }
                 }
                 Text(
                     if (includeMedia) {
-                        "Estimated backup: ${BackupEstimate.humanReadable(BackupEstimate.estimatedBytes(recordedVideoBytes, true))} " +
-                            "including $recordingCount recorded clip(s)."
+                        tr("Estimated backup: {size} ", "size" to (BackupEstimate.humanReadable(BackupEstimate.estimatedBytes(recordedVideoBytes, true)))) +
+                            tr("including {recordingCount} recorded clip(s).", "recordingCount" to recordingCount)
                     } else {
-                        "Estimated backup: ${BackupEstimate.humanReadable(BackupEstimate.estimatedBytes(recordedVideoBytes, false))}; videos excluded."
+                        tr("Estimated backup: {size}; videos excluded.", "size" to (BackupEstimate.humanReadable(BackupEstimate.estimatedBytes(recordedVideoBytes, false))))
                     },
                     style = MaterialTheme.typography.bodySmall
                 )
@@ -190,10 +192,10 @@ internal fun BackupRestoreScreen(vm: MainViewModel) {
                     },
                     enabled = passwordValid && !working,
                     modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
-                ) { Text("Choose backup location") }
+                ) { Text(tr("Choose backup location")) }
                 if (!passwordValid && (exportPassword.isNotEmpty() || exportPasswordAgain.isNotEmpty())) {
                     Text(
-                        "Passwords must match and contain at least 6 characters.",
+                        tr("Passwords must match and contain at least 6 characters."),
                         color = MaterialTheme.colorScheme.error,
                         style = MaterialTheme.typography.bodySmall
                     )
@@ -206,32 +208,32 @@ internal fun BackupRestoreScreen(vm: MainViewModel) {
                 Modifier.padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Text("Automatic backup", style = MaterialTheme.typography.titleMedium)
+                Text(tr("Automatic backup"), style = MaterialTheme.typography.titleMedium)
                 if (!autoBackup.enabled) {
                     Text(
-                        "After every finished match, into a folder you pick once: on the phone, an SD card, or a " +
-                            "cloud app that offers folders there. Uses the password above; the newest " +
-                            "${AutoBackupRules.KEEP} are kept. Google Drive usually does not offer folders: use " +
-                            "\"Share latest backup\" afterwards to save a copy there.",
+                        tr("After every finished match, into a folder you pick once: on the phone, an SD card, or a ") +
+                            tr("cloud app that offers folders there. Uses the password above; the newest ") +
+                            tr("{count} are kept. Google Drive usually does not offer folders: use ", "count" to AutoBackupRules.KEEP) +
+                            tr("\"Share latest backup\" afterwards to save a copy there."),
                         style = MaterialTheme.typography.bodySmall
                     )
                     AppButton(
                         onClick = { autoBackupFolderLauncher.launch(null) },
                         enabled = passwordValid && !working,
                         modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
-                    ) { Text("Choose folder and turn on") }
+                    ) { Text(tr("Choose folder and turn on")) }
                     if (!passwordValid) {
-                        Text("Enter and repeat a password above first.", style = MaterialTheme.typography.bodySmall)
+                        Text(tr("Enter and repeat a password above first."), style = MaterialTheme.typography.bodySmall)
                     }
                 } else {
-                    Text("Folder: ${autoBackup.folderName ?: "chosen folder"}")
+                    Text(tr("Folder: {folderName}", "folderName" to (autoBackup.folderName ?: tr("chosen folder"))))
                     Text(
                         when {
-                            autoBackup.running -> "Backing up…"
-                            autoBackup.lastError != null -> "Last automatic backup failed: ${autoBackup.lastError}"
-                            autoBackup.lastSuccessEpochMs != null -> "Last automatic backup " +
+                            autoBackup.running -> tr("Backing up…")
+                            autoBackup.lastError != null -> tr("Last automatic backup failed: {lastError}", "lastError" to autoBackup.lastError)
+                            autoBackup.lastSuccessEpochMs != null -> tr("Last automatic backup ") +
                                 SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault()).format(Date(autoBackup.lastSuccessEpochMs!!))
-                            else -> "Runs after the next finished match."
+                            else -> tr("Runs after the next finished match.")
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = if (autoBackup.lastError != null && !autoBackup.running) {
@@ -243,14 +245,14 @@ internal fun BackupRestoreScreen(vm: MainViewModel) {
                             checked = autoBackup.includeMedia,
                             onCheckedChange = vm::setAutoBackupIncludesMedia
                         )
-                        Text("Include video files", Modifier.weight(1f))
+                        Text(tr("Include video files"), Modifier.weight(1f))
                     }
                     if (autoBackup.includeMedia && recordedVideoBytes > 0L) {
                         val oneBackup = BackupEstimate.estimatedBytes(recordedVideoBytes, true)
                         Text(
-                            "Each automatic backup copies all recorded video (about ${BackupEstimate.humanReadable(oneBackup)}). " +
-                                "Keeping ${AutoBackupRules.KEEP} can take up to " +
-                                "${BackupEstimate.humanReadable(AutoBackupRules.keptBytes(oneBackup))} in the folder.",
+                            tr("Each automatic backup copies all recorded video (about {oneBackup}). ", "oneBackup" to (BackupEstimate.humanReadable(oneBackup))) +
+                                tr("Keeping {count} can take up to ", "count" to AutoBackupRules.KEEP) +
+                                tr("{oneBackup} in the folder.", "oneBackup" to (BackupEstimate.humanReadable(AutoBackupRules.keptBytes(oneBackup)))),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.error
                         )
@@ -260,25 +262,25 @@ internal fun BackupRestoreScreen(vm: MainViewModel) {
                             onClick = vm::runAutoBackupNow,
                             enabled = !autoBackup.running,
                             modifier = Modifier.weight(1f).heightIn(min = 48.dp)
-                        ) { Text("Back up now") }
+                        ) { Text(tr("Back up now")) }
                         AppOutlinedButton(
                             onClick = vm::disableAutoBackup,
                             enabled = !autoBackup.running,
                             modifier = Modifier.heightIn(min = 48.dp)
-                        ) { Text("Turn off") }
+                        ) { Text(tr("Turn off")) }
                     }
                     if (autoBackup.lastSuccessEpochMs != null) {
                         AppOutlinedButton(
                             onClick = {
                                 scope.launch {
                                     val latest = vm.latestAutoBackup()
-                                    if (latest == null) autoBackupMessage = "No automatic backup was found in the folder."
-                                    else ExternalApps.share(context, latest, "application/octet-stream", "MatchReview backup")
+                                    if (latest == null) autoBackupMessage = tr("No automatic backup was found in the folder.")
+                                    else ExternalApps.share(context, latest, "application/octet-stream", tr("MatchReview backup"))
                                 }
                             },
                             enabled = !autoBackup.running,
                             modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
-                        ) { Text("Share latest backup (Drive, e-mail…)") }
+                        ) { Text(tr("Share latest backup (Drive, e-mail…)")) }
                     }
                 }
                 autoBackupMessage?.let {
@@ -292,14 +294,14 @@ internal fun BackupRestoreScreen(vm: MainViewModel) {
                 Modifier.padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Text("Restore backup", style = MaterialTheme.typography.titleMedium)
+                Text(tr("Restore backup"), style = MaterialTheme.typography.titleMedium)
                 Text(
-                    "The selected backup is decrypted and inspected before you are asked to replace current data."
+                    tr("The selected backup is decrypted and inspected before you are asked to replace current data.")
                 )
                 OutlinedTextField(
                     value = restorePassword,
                     onValueChange = { restorePassword = it },
-                    label = { Text("Backup password") },
+                    label = { Text(tr("Backup password")) },
                     visualTransformation = if (showRestorePassword) {
                         VisualTransformation.None
                     } else {
@@ -307,7 +309,7 @@ internal fun BackupRestoreScreen(vm: MainViewModel) {
                     },
                     trailingIcon = {
                         TextButton(onClick = { showRestorePassword = !showRestorePassword }) {
-                            Text(if (showRestorePassword) "Hide" else "Show")
+                            Text(if (showRestorePassword) tr("Hide") else tr("Show"))
                         }
                     },
                     singleLine = true,
@@ -320,9 +322,9 @@ internal fun BackupRestoreScreen(vm: MainViewModel) {
                         containerColor = MaterialTheme.colorScheme.error
                     ),
                     modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
-                ) { Text("Select and inspect backup") }
+                ) { Text(tr("Select and inspect backup")) }
                 Text(
-                    "Restore is blocked while a match or recording is active.",
+                    tr("Restore is blocked while a match or recording is active."),
                     style = MaterialTheme.typography.bodySmall
                 )
             }
@@ -330,7 +332,7 @@ internal fun BackupRestoreScreen(vm: MainViewModel) {
 
         if (previewState is RestorePreviewState.Working) {
             LinearProgressIndicator(Modifier.fillMaxWidth())
-            Text("Decrypting and validating backup…")
+            Text(tr("Decrypting and validating backup…"))
         }
         if (previewState is RestorePreviewState.Error) {
             val error = previewState as RestorePreviewState.Error
@@ -339,14 +341,14 @@ internal fun BackupRestoreScreen(vm: MainViewModel) {
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(Modifier.padding(16.dp)) {
-                    Text("Backup could not be inspected", style = MaterialTheme.typography.titleMedium)
+                    Text(tr("Backup could not be inspected"), style = MaterialTheme.typography.titleMedium)
                     Text(error.message)
                     TextButton(
                         onClick = {
                             selectedRestoreUri = null
                             vm.clearRestorePreview()
                         }
-                    ) { Text("Dismiss") }
+                    ) { Text(tr("Dismiss")) }
                 }
             }
         }
@@ -367,13 +369,13 @@ internal fun BackupRestoreScreen(vm: MainViewModel) {
                     Column(Modifier.padding(16.dp)) {
                         Text(state.message, style = MaterialTheme.typography.titleMedium)
                         Text(
-                            "${state.result.teams} teams, ${state.result.players} players, " +
-                                "${state.result.matches} matches, ${state.result.mediaFiles} media files"
+                            tr("{teams} teams, {players} players, ", "teams" to state.result.teams, "players" to state.result.players) +
+                                tr("{matches} matches, {mediaFiles} media files", "matches" to state.result.matches, "mediaFiles" to state.result.mediaFiles)
                         )
                         state.result.warnings.forEach {
                             Text("• $it", style = MaterialTheme.typography.bodySmall)
                         }
-                        TextButton(onClick = vm::clearBackupOperation) { Text("Dismiss") }
+                        TextButton(onClick = vm::clearBackupOperation) { Text(tr("Dismiss")) }
                     }
                 }
             }
@@ -385,9 +387,9 @@ internal fun BackupRestoreScreen(vm: MainViewModel) {
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(Modifier.padding(16.dp)) {
-                        Text("Backup operation failed", style = MaterialTheme.typography.titleMedium)
+                        Text(tr("Backup operation failed"), style = MaterialTheme.typography.titleMedium)
                         Text(state.message)
-                        TextButton(onClick = vm::clearBackupOperation) { Text("Dismiss") }
+                        TextButton(onClick = vm::clearBackupOperation) { Text(tr("Dismiss")) }
                     }
                 }
             }
@@ -401,30 +403,30 @@ internal fun BackupRestoreScreen(vm: MainViewModel) {
                 selectedRestoreUri = null
                 vm.clearRestorePreview()
             },
-            title = { Text("Review backup before restore") },
+            title = { Text(tr("Review backup before restore")) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("Created: ${readyPreview.createdAtUtc}")
-                    Text("Source app: ${readyPreview.appVersionName} (${readyPreview.appVersionCode})")
+                    Text(tr("Created: {createdAtUtc}", "createdAtUtc" to readyPreview.createdAtUtc))
+                    Text(tr("Source app: {appVersionName} ({appVersionCode})", "appVersionName" to readyPreview.appVersionName, "appVersionCode" to readyPreview.appVersionCode))
                     Text(
-                        "Versions: database ${readyPreview.databaseVersion}, " +
-                            "backup ${readyPreview.backupFormatVersion}"
+                        tr("Versions: database {databaseVersion}, ", "databaseVersion" to readyPreview.databaseVersion) +
+                            tr("backup {backupFormatVersion}", "backupFormatVersion" to readyPreview.backupFormatVersion)
                     )
                     Text(
-                        "${readyPreview.teams} teams • ${readyPreview.players} players • " +
-                            "${readyPreview.matches} matches"
+                        tr("{teams} teams • {players} players • ", "teams" to readyPreview.teams, "players" to readyPreview.players) +
+                            tr("{matches} matches", "matches" to readyPreview.matches)
                     )
                     Text(
                         if (readyPreview.includesMedia) {
-                            "${readyPreview.mediaFiles} video files included"
+                            tr("{mediaFiles} video files included", "mediaFiles" to readyPreview.mediaFiles)
                         } else {
-                            "Videos are not included"
+                            tr("Videos are not included")
                         }
                     )
                     HorizontalDivider()
                     Text(
-                        "Restoring replaces all current teams and match data. Cancel now and create " +
-                            "a safety backup first if needed.",
+                        tr("Restoring replaces all current teams and match data. Cancel now and create ") +
+                            tr("a safety backup first if needed."),
                         color = MaterialTheme.colorScheme.error
                     )
                 }
@@ -439,7 +441,7 @@ internal fun BackupRestoreScreen(vm: MainViewModel) {
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.error
                     )
-                ) { Text("Restore and replace") }
+                ) { Text(tr("Restore and replace")) }
             },
             dismissButton = {
                 TextButton(
@@ -447,7 +449,7 @@ internal fun BackupRestoreScreen(vm: MainViewModel) {
                         selectedRestoreUri = null
                         vm.clearRestorePreview()
                     }
-                ) { Text("Cancel") }
+                ) { Text(tr("Cancel")) }
             }
         )
     }

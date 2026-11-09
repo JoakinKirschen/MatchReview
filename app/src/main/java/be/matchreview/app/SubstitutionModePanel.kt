@@ -1,5 +1,7 @@
 package be.matchreview.app
 
+import be.matchreview.app.i18n.tr
+
 import be.matchreview.app.ui.AppButton
 import be.matchreview.app.ui.AppOutlinedButton
 import be.matchreview.app.ui.isLandscape
@@ -191,7 +193,7 @@ internal fun SubstitutionModePanel(
             onDragCancel = { drag = null },
             subtitleFor = minutesLabel,
             highlightedPlayerId = swapTarget ?: selectedId,
-            dropHint = swapTarget?.let { "Swap with ${playersById[it]?.name ?: "player"}" },
+            dropHint = swapTarget?.let { tr("Swap with {it}", "it" to (playersById[it]?.name ?: "player")) },
             horizontal = landscape,
             modifier = modifier.padding(horizontal = 2.dp, vertical = 2.dp)
         )
@@ -211,7 +213,7 @@ internal fun SubstitutionModePanel(
             onDragMove = { pointer -> drag = drag?.copy(pointerInRoot = pointer) },
             onDragEnd = ::finishDrag,
             onDragCancel = { drag = null },
-            subtitleFor = { id -> if (canMove(id)) minutesLabel(id) else "Out" },
+            subtitleFor = { id -> if (canMove(id)) minutesLabel(id) else tr("Out") },
             canDrag = ::canMove,
             highlightFor = { it in leastPlayedBench },
             vertical = landscape,
@@ -223,7 +225,7 @@ internal fun SubstitutionModePanel(
             onClick = onCancel,
             enabled = drag == null,
             modifier = modifier.heightIn(min = 48.dp)
-        ) { Text(if (changes.isEmpty) "Close" else "Discard") }
+        ) { Text(if (changes.isEmpty) tr("Close") else tr("Discard")) }
     }
     val confirmButton: @Composable (Modifier) -> Unit = { modifier ->
         AppButton(
@@ -233,10 +235,10 @@ internal fun SubstitutionModePanel(
         ) {
             Text(
                 when {
-                    changes.isEmpty -> "Done"
+                    changes.isEmpty -> tr("Done")
                     changes.hasSubstitutions ->
-                        "Confirm ${maxOf(changes.incoming.size, changes.outgoing.size)} change(s)"
-                    else -> "Confirm positions"
+                        tr("Confirm {outgoing} change(s)", "outgoing" to (maxOf(changes.incoming.size, changes.outgoing.size)))
+                    else -> tr("Confirm positions")
                 },
                 maxLines = 1
             )
@@ -249,17 +251,17 @@ internal fun SubstitutionModePanel(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text("Substitutions", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            Text(tr("Substitutions"), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
             Text(
                 when {
-                    selectedId != null -> "Tap a player to swap with ${playersById[selectedId]?.name ?: "player"}"
-                    changes.isEmpty -> "Drag a substitute onto a player"
+                    selectedId != null -> tr("Tap a player to swap with {selected}", "selected" to (playersById[selectedId]?.name ?: "player"))
+                    changes.isEmpty -> tr("Drag a substitute onto a player")
                     else -> listOfNotNull(
                         changes.incoming.takeIf { it.isNotEmpty() }
-                            ?.joinToString(prefix = "▲ ") { playersById[it]?.name?.substringBefore(" ") ?: "Player" },
+                            ?.joinToString(prefix = "▲ ") { playersById[it]?.name?.substringBefore(" ") ?: tr("Player") },
                         changes.outgoing.takeIf { it.isNotEmpty() }
-                            ?.joinToString(prefix = "▼ ") { playersById[it]?.name?.substringBefore(" ") ?: "Player" },
-                        changes.moved.takeIf { it.isNotEmpty() }?.let { "${it.size} moved" }
+                            ?.joinToString(prefix = "▼ ") { playersById[it]?.name?.substringBefore(" ") ?: tr("Player") },
+                        changes.moved.takeIf { it.isNotEmpty() }?.let { tr("{count} moved", "count" to it.size) }
                     ).joinToString("  ")
                 },
                 style = MaterialTheme.typography.labelMedium,

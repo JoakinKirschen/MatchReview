@@ -1,5 +1,7 @@
 package be.matchreview.app
 
+import be.matchreview.app.i18n.tr
+
 import android.graphics.pdf.PdfDocument
 import be.matchreview.app.data.Team
 import be.matchreview.app.domain.SeasonReport
@@ -15,21 +17,21 @@ object SeasonReportPdfExporter {
             val writer = PdfWriter(document)
             TeamLogoCodec.decode(team?.logoPng)?.let { writer.logo(it) }
             writer.heading(report.teamName)
-            writer.text("Season report", emphasized = true)
-            writer.text("Created ${DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date())}", small = true)
+            writer.text(tr("Season report"), emphasized = true)
+            writer.text(tr("Created {date}", "date" to (DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date()))), small = true)
             writer.spacer(8f)
             with(report.summary) {
-                writer.labelValue("Played", "$played")
-                writer.labelValue("Record", "$won won, $drawn drawn, $lost lost")
-                writer.labelValue("Goals", "$goalsFor for, $goalsAgainst against")
+                writer.labelValue(tr("Played"), "$played")
+                writer.labelValue(tr("Record"), tr("{won} won, {drawn} drawn, {lost} lost", "won" to won, "drawn" to drawn, "lost" to lost))
+                writer.labelValue(tr("Goals"), tr("{goalsFor} for, {goalsAgainst} against", "goalsFor" to goalsFor, "goalsAgainst" to goalsAgainst))
             }
 
-            writer.section("Matches")
+            writer.section(tr("Matches"))
             if (report.matches.isEmpty()) {
-                writer.text("No finished matches yet.")
+                writer.text(tr("No finished matches yet."))
             } else {
                 writer.table(
-                    headers = listOf("Date", "Opponent", "H/A", "Score", "Result"),
+                    headers = listOf(tr("Date"), tr("Opponent"), "H/A", tr("Score"), tr("Result")),
                     rows = report.matches.map {
                         listOf(
                             it.date,
@@ -43,12 +45,12 @@ object SeasonReportPdfExporter {
                 )
             }
 
-            writer.section("Players")
+            writer.section(tr("Players"))
             if (report.players.isEmpty()) {
-                writer.text("No players yet.")
+                writer.text(tr("No players yet."))
             } else {
                 writer.table(
-                    headers = listOf("Player", "M", "Min", "G", "A", "S", "YC", "RC"),
+                    headers = listOf(tr("Player"), "M", tr("Min"), "G", "A", "S", "YC", "RC"),
                     rows = report.players.map {
                         listOf(
                             listOfNotNull(it.shirtNumber.takeIf { n -> n > 0 }?.let { n -> "#$n" }, it.name).joinToString(" "),
@@ -59,16 +61,16 @@ object SeasonReportPdfExporter {
                     weights = listOf(3.2f, 0.7f, 0.9f, 0.7f, 0.7f, 0.7f, 0.7f, 0.7f)
                 )
                 writer.text(
-                    "M matches, Min minutes, G goals, A assists, S saves, YC yellow cards, RC red cards. " +
-                        "Totals include corrections made in the app.",
+                    tr("M matches, Min minutes, G goals, A assists, S saves, YC yellow cards, RC red cards. ") +
+                        tr("Totals include corrections made in the app."),
                     small = true
                 )
             }
 
             writer.spacer(10f)
             writer.text(
-                "Privacy notice: this report contains player names and match data. " +
-                    "Share and store it only with appropriate permission.",
+                tr("Privacy notice: this report contains player names and match data. ") +
+                    tr("Share and store it only with appropriate permission."),
                 small = true
             )
             writer.finish()

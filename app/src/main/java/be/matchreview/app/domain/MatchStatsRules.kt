@@ -1,5 +1,7 @@
 package be.matchreview.app.domain
 
+import be.matchreview.app.i18n.tr
+
 import be.matchreview.app.data.MatchEvent
 
 /** Event types for the quick match actions; a red card for our player is a DISMISSAL. */
@@ -26,12 +28,12 @@ object MatchActions {
     )
 
     fun label(type: String): String? = when (type) {
-        OUR_SHOT_ON_TARGET, OPPONENT_SHOT_ON_TARGET -> "Shot on target"
-        OUR_SHOT_OFF_TARGET, OPPONENT_SHOT_OFF_TARGET -> "Shot off target"
-        OUR_CORNER, OPPONENT_CORNER -> "Corner"
-        YELLOW_CARD, OPPONENT_YELLOW_CARD -> "Yellow card"
-        RED_CARD, OPPONENT_RED_CARD -> "Red card"
-        MARK -> "Marked moment"
+        OUR_SHOT_ON_TARGET, OPPONENT_SHOT_ON_TARGET -> tr("Shot on target")
+        OUR_SHOT_OFF_TARGET, OPPONENT_SHOT_OFF_TARGET -> tr("Shot off target")
+        OUR_CORNER, OPPONENT_CORNER -> tr("Corner")
+        YELLOW_CARD, OPPONENT_YELLOW_CARD -> tr("Yellow card")
+        RED_CARD, OPPONENT_RED_CARD -> tr("Red card")
+        MARK -> tr("Marked moment")
         else -> null
     }
 
@@ -89,11 +91,11 @@ object MatchStatsRules {
 
     /** Rows of (label, ours, opponent) for tables in the app and the PDF. */
     fun rows(stats: MatchStats): List<Triple<String, Int, Int>> = listOf(
-        Triple("Goals", stats.ours.goals, stats.opponent.goals),
-        Triple("Shots", stats.ours.shots, stats.opponent.shots),
-        Triple("On target", stats.ours.shotsOnTarget, stats.opponent.shotsOnTarget),
-        Triple("Corners", stats.ours.corners, stats.opponent.corners),
-        Triple("Yellow cards", stats.ours.yellowCards, stats.opponent.yellowCards),
-        Triple("Red cards", stats.ours.redCards, stats.opponent.redCards)
+        Triple(tr("Goals"), stats.ours.goals, stats.opponent.goals),
+        Triple(tr("Shots"), stats.ours.shots, stats.opponent.shots),
+        Triple(tr("On target"), stats.ours.shotsOnTarget, stats.opponent.shotsOnTarget),
+        Triple(tr("Corners"), stats.ours.corners, stats.opponent.corners),
+        Triple(tr("Yellow cards"), stats.ours.yellowCards, stats.opponent.yellowCards),
+        Triple(tr("Red cards"), stats.ours.redCards, stats.opponent.redCards)
     )
 }

@@ -1,5 +1,7 @@
 package be.matchreview.app.domain
 
+import be.matchreview.app.i18n.tr
+
 import be.matchreview.app.data.GameMatch
 import be.matchreview.app.data.MatchEvent
 import be.matchreview.app.data.MatchStatus
@@ -87,20 +89,20 @@ object SeasonReportRules {
 
     /** The report as CSV with three blocks: record, matches and players. */
     fun toCsv(report: SeasonReport): String = buildList {
-        add(row("Season report", report.teamName))
+        add(row(tr("Season report"), report.teamName))
         add("")
-        add(row("Played", "Won", "Drawn", "Lost", "Goals for", "Goals against"))
+        add(row(tr("Played"), tr("Won"), tr("Drawn"), tr("Lost"), tr("Goals for"), tr("Goals against")))
         with(report.summary) {
             add(row("$played", "$won", "$drawn", "$lost", "$goalsFor", "$goalsAgainst"))
         }
         add("")
-        add(row("Date", "Opponent", "Home/Away", "Competition", "Score", "Result"))
+        add(row(tr("Date"), tr("Opponent"), "Home/Away", tr("Competition"), tr("Score"), tr("Result")))
         report.matches.forEach {
-            add(row(it.date, it.opponent, if (it.isHome) "Home" else "Away", it.competition,
+            add(row(it.date, it.opponent, if (it.isHome) tr("Home") else tr("Away"), it.competition,
                 "${it.ourScore}-${it.opponentScore}", it.result))
         }
         add("")
-        add(row("Number", "Player", "Matches", "Minutes", "Goals", "Assists", "Saves", "Yellow cards", "Red cards"))
+        add(row(tr("Number"), tr("Player"), tr("Matches"), tr("Minutes"), tr("Goals"), tr("Assists"), tr("Saves"), tr("Yellow cards"), tr("Red cards")))
         report.players.forEach {
             add(row(it.shirtNumber.takeIf { number -> number > 0 }?.toString().orEmpty(), it.name,
                 "${it.matches}", "${it.minutes}", "${it.goals}", "${it.assists}", "${it.saves}",

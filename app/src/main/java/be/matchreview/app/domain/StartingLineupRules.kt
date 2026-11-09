@@ -1,5 +1,7 @@
 package be.matchreview.app.domain
 
+import be.matchreview.app.i18n.tr
+
 import be.matchreview.app.data.MatchEvent
 import be.matchreview.app.data.MatchLineupPlacement
 import be.matchreview.app.data.ParticipationReason
@@ -61,7 +63,7 @@ object StartingLineupRules {
             matchId = matchId,
             timestampMs = 0L,
             type = KICK_OFF,
-            note = "Starting lineup (approximate)",
+            note = tr("Starting lineup (approximate)"),
             periodNumber = 1,
             lineupSnapshot = lineup
                 .sortedBy { it.playerId }
