@@ -287,6 +287,37 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      # Only when the release key is stored as repository secrets (see RELEASE_SIGNING.md);
+      # otherwise this step does nothing and the build stays green.
+      - name: Build signed release APK
+        id: release
+        if: steps.build.outcome == 'success'
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.MATCHREVIEW_KEYSTORE_BASE64 }}
+          MATCHREVIEW_KEYSTORE_PASSWORD: ${{ secrets.MATCHREVIEW_KEYSTORE_PASSWORD }}
+          MATCHREVIEW_KEY_ALIAS: ${{ secrets.MATCHREVIEW_KEY_ALIAS }}
+          MATCHREVIEW_KEY_PASSWORD: ${{ secrets.MATCHREVIEW_KEY_PASSWORD }}
+        run: |
+          if [[ -z "$KEYSTORE_BASE64" ]]; then
+            echo "No release key in the repository secrets; skipping the signed release build."
+            exit 0
+          fi
+          keystore="$RUNNER_TEMP/release.jks"
+          echo "$KEYSTORE_BASE64" | base64 --decode > "$keystore"
+          MATCHREVIEW_KEYSTORE_FILE="$keystore" ./gradlew assembleRelease --console=plain --no-daemon
+          rm -f "$keystore"
+          echo "built=true" >> "$GITHUB_OUTPUT"
+
+      - name: Upload signed release APK
+        if: steps.release.outputs.built == 'true'
+        uses: actions/upload-artifact@v6
+        with:
+          name: android-release-apk
+          path: "**/build/outputs/apk/release/*.apk"
+          if-no-files-found: error
+          retention-days: 30
+
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v6
