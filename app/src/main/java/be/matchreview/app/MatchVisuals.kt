@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.sp
 import be.matchreview.app.data.GameMatch
 import be.matchreview.app.data.MatchEvent
 import be.matchreview.app.data.Player
+import be.matchreview.app.domain.GoalMarks
 import be.matchreview.app.domain.GoalMouthGeometry
 import be.matchreview.app.domain.MatchClockCalculator
 import be.matchreview.app.domain.TimelineItem
@@ -48,16 +49,72 @@ import java.util.TimeZone
 private val IncomingHighlight = Color(0xFFFFD54F)
 private val OurGoalColor = Color(0xFF2E7D32)
 private val OpponentGoalColor = Color(0xFFC62828)
+private val BadgeInk = Color(0xFF14232F)
+private val AssistBlue = Color(0xFF1971C2)
+
+/** A ball in a small white badge; [count] is shown from two goals on. */
+@Composable
+internal fun GoalBadge(count: Int, modifier: Modifier = Modifier) {
+    Row(
+        modifier
+            .height(15.dp)
+            .widthIn(min = 15.dp)
+            .clip(CircleShape)
+            .background(Color.White)
+            .border(1.5.dp, BadgeInk.copy(alpha = 0.55f), CircleShape)
+            .padding(horizontal = 2.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text("⚽", fontSize = 9.sp, lineHeight = 10.sp)
+        if (count > 1) {
+            Text("$count", color = BadgeInk, fontSize = 9.sp, lineHeight = 10.sp, fontWeight = FontWeight.ExtraBold)
+        }
+    }
+}
+
+/** The assist letter in a small blue badge; [count] is shown from two assists on. */
+@Composable
+internal fun AssistBadge(count: Int, modifier: Modifier = Modifier) {
+    Row(
+        modifier
+            .height(15.dp)
+            .widthIn(min = 15.dp)
+            .clip(CircleShape)
+            .background(AssistBlue)
+            .border(1.5.dp, Color.White, CircleShape)
+            .padding(horizontal = 3.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            tr("A|assist marker") + if (count > 1) "$count" else "",
+            color = Color.White,
+            fontSize = 9.sp,
+            lineHeight = 10.sp,
+            fontWeight = FontWeight.ExtraBold,
+            maxLines = 1
+        )
+    }
+}
+
+/** "2 goal(s), 1 assist(s)" for screen readers. */
+private fun describeMarks(mark: GoalMarks): String = listOfNotNull(
+    tr("{count} goal(s)", "count" to mark.goals).takeIf { mark.goals > 0 },
+    tr("{count} assist(s)", "count" to mark.assists).takeIf { mark.assists > 0 }
+).joinToString(", ")
 
 /**
  * A picture of the pitch after a lineup change, on its side so it fills the card width:
- * our goal on the left, attacking to the right. New players are highlighted.
+ * our goal on the left, attacking to the right. New players are highlighted, and [marks]
+ * puts a ball on scorers and an assist badge on the players who gave the assist.
  */
 @Composable
 fun LineupSnapshotPitch(
     change: TimelineItem.LineupChange,
     playersById: Map<Long, Player>,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    marks: Map<Long, GoalMarks> = emptyMap()
 ) {
     val incoming = change.incomingPlayerIds.toSet()
     val positions = change.snapshot
@@ -69,7 +126,10 @@ fun LineupSnapshotPitch(
             .background(PitchColors.grass)
             .semantics {
                 contentDescription = tr("Lineup after the change: ") +
-                    positions.joinToString { playersById[it.playerId]?.name ?: "player" }
+                    positions.joinToString { position ->
+                        (playersById[position.playerId]?.name ?: "player") +
+                            marks[position.playerId]?.let { " (${describeMarks(it)})" }.orEmpty()
+                    }
             }
     ) {
         PitchLines(Modifier.fillMaxSize(), horizontal = true)
@@ -86,21 +146,32 @@ fun LineupSnapshotPitch(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 val isNew = position.playerId in incoming
-                Box(
-                    Modifier
-                        .size(marker)
-                        .clip(CircleShape)
-                        .background(if (isNew) IncomingHighlight else Color(0xFFF5F7FA))
-                        .border(2.dp, if (isNew) Color(0xFF8D6E00) else Color.Transparent, CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        player?.shirtNumber?.takeIf { it > 0 }?.toString()
-                            ?: player?.name?.take(1)?.uppercase() ?: "?",
-                        color = Color(0xFF1C3D6E),
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.ExtraBold
-                    )
+                // The badges sit on the corners of the circle, outside its clip.
+                Box(Modifier.size(marker)) {
+                    Box(
+                        Modifier
+                            .matchParentSize()
+                            .clip(CircleShape)
+                            .background(if (isNew) IncomingHighlight else Color(0xFFF5F7FA))
+                            .border(2.dp, if (isNew) Color(0xFF8D6E00) else Color.Transparent, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            player?.shirtNumber?.takeIf { it > 0 }?.toString()
+                                ?: player?.name?.take(1)?.uppercase() ?: "?",
+                            color = Color(0xFF1C3D6E),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                    }
+                    marks[position.playerId]?.let { mark ->
+                        if (mark.goals > 0) {
+                            GoalBadge(mark.goals, Modifier.align(Alignment.TopEnd).offset(x = 8.dp, y = (-6).dp))
+                        }
+                        if (mark.assists > 0) {
+                            AssistBadge(mark.assists, Modifier.align(Alignment.TopStart).offset(x = (-8).dp, y = (-6).dp))
+                        }
+                    }
                 }
                 Text(
                     player?.name?.substringBefore(" ") ?: "",
@@ -116,12 +187,33 @@ fun LineupSnapshotPitch(
     }
 }
 
-/** Timeline card for one substitution round: who came on and off plus the new shape. */
+/** Explains the badges under a lineup picture that has any. */
+@Composable
+private fun GoalMarksLegend(marks: Collection<GoalMarks>) {
+    Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
+        if (marks.any { it.goals > 0 }) LegendBadge(tr("Goal")) { GoalBadge(1) }
+        if (marks.any { it.assists > 0 }) LegendBadge(tr("Assist")) { AssistBadge(1) }
+    }
+}
+
+@Composable
+private fun LegendBadge(label: String, badge: @Composable () -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        badge()
+        Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+/**
+ * Timeline card for one substitution round: who came on and off plus the new shape.
+ * [marks] are the goals and assists while this lineup was on the pitch.
+ */
 @Composable
 fun LineupChangeCard(
     change: TimelineItem.LineupChange,
     playersById: Map<Long, Player>,
     modifier: Modifier = Modifier,
+    marks: Map<Long, GoalMarks> = emptyMap(),
     trailing: @Composable () -> Unit = {}
 ) {
     fun names(ids: List<Long>) = ids.joinToString(", ") { playersById[it]?.name ?: tr("Player") }
@@ -154,7 +246,8 @@ fun LineupChangeCard(
                 }
                 trailing()
             }
-            LineupSnapshotPitch(change = change, playersById = playersById)
+            LineupSnapshotPitch(change = change, playersById = playersById, marks = marks)
+            if (marks.isNotEmpty()) GoalMarksLegend(marks.values)
         }
     }
 }

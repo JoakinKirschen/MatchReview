@@ -15,8 +15,10 @@ import be.matchreview.app.data.Player
 import be.matchreview.app.data.PlayerParticipation
 import be.matchreview.app.data.RecordingSegment
 import be.matchreview.app.data.Team
+import be.matchreview.app.domain.GoalMarks
 import be.matchreview.app.domain.GoalMouthGeometry
 import be.matchreview.app.domain.GoalSummaryRules
+import be.matchreview.app.domain.LineupGoalRules
 import be.matchreview.app.domain.MatchActions
 import be.matchreview.app.domain.MatchStatsRules
 import be.matchreview.app.domain.StartingLineupRules
@@ -151,17 +153,26 @@ object MatchPdfExporter {
                 }
             }
 
-            val lineupChanges = TimelineGrouping
-                .group(lineupEvents)
-                .filterIsInstance<TimelineItem.LineupChange>()
+            val lineupItems = TimelineGrouping.group(lineupEvents)
+            val lineupChanges = lineupItems.filterIsInstance<TimelineItem.LineupChange>()
+            val goalMarks = LineupGoalRules.marks(lineupItems)
             if (lineupChanges.isNotEmpty()) {
                 writer.section(tr("Starting lineup and changes"))
                 writer.text(tr("Highlighted players came on at that moment."), small = true)
+                if (goalMarks.isNotEmpty()) {
+                    writer.text(
+                        tr("Goals and assists are marked on the lineup that was on the pitch when the goal was scored."),
+                        small = true
+                    )
+                    writer.block(16f) { canvas, top ->
+                        drawMarksLegend(canvas, goalMarks.values.flatMap { it.values }, MARGIN, top)
+                    }
+                }
                 lineupChanges.chunked(3).forEach { row ->
                     writer.block(PITCH_HEIGHT + 30f) { canvas, top ->
                         row.forEachIndexed { index, change ->
                             val left = MARGIN + index * (PITCH_WIDTH + 24f)
-                            drawPitch(canvas, change, playersById, left, top)
+                            drawPitch(canvas, change, playersById, goalMarks[change.key].orEmpty(), left, top)
                         }
                     }
                 }
@@ -233,10 +244,73 @@ object MatchPdfExporter {
     private const val GOAL_MAP_WIDTH = 360f
     private const val GOAL_MAP_HEIGHT = GOAL_MAP_WIDTH / GoalMouthGeometry.ASPECT_RATIO
 
+    private val BADGE_INK = 0xFF14232F.toInt()
+    private val ASSIST_BLUE = 0xFF1971C2.toInt()
+    private const val BADGE_RADIUS = 3.6f
+
+    /** A small ball with its centre at [x], [y]; [count] is written next to it from two goals on. */
+    private fun drawGoalBadge(canvas: Canvas, x: Float, y: Float, count: Int) {
+        val ink = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = BADGE_INK }
+        canvas.drawCircle(x, y, BADGE_RADIUS, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE })
+        canvas.drawCircle(x, y, BADGE_RADIUS, Paint(ink).apply { style = Paint.Style.STROKE; strokeWidth = 0.7f })
+        canvas.drawCircle(x, y, 1.3f, ink)
+        if (count > 1) {
+            ink.textSize = 6f
+            ink.typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
+            canvas.drawText("$count", x + BADGE_RADIUS + 1f, y + 2.2f, ink)
+        }
+    }
+
+    /** The assist letter in a small blue circle; [count] is written before it from two assists on. */
+    private fun drawAssistBadge(canvas: Canvas, x: Float, y: Float, count: Int) {
+        canvas.drawCircle(x, y, BADGE_RADIUS, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = ASSIST_BLUE })
+        canvas.drawCircle(x, y, BADGE_RADIUS, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            style = Paint.Style.STROKE
+            strokeWidth = 0.6f
+        })
+        val bold = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
+        canvas.drawText(tr("A|assist marker"), x, y + 1.8f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            textSize = 5f
+            textAlign = Paint.Align.CENTER
+            typeface = bold
+        })
+        if (count > 1) {
+            canvas.drawText("$count", x - BADGE_RADIUS - 1f, y + 2.2f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = BADGE_INK
+                textSize = 6f
+                textAlign = Paint.Align.RIGHT
+                typeface = bold
+            })
+        }
+    }
+
+    /** Explains the badges: only the kinds that appear in this match. */
+    private fun drawMarksLegend(canvas: Canvas, marks: Collection<GoalMarks>, left: Float, top: Float) {
+        val label = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.DKGRAY
+            textSize = 9f
+        }
+        val centerY = top + 6f
+        var x = left
+        if (marks.any { it.goals > 0 }) {
+            drawGoalBadge(canvas, x + BADGE_RADIUS, centerY, 1)
+            val text = tr("Goal")
+            canvas.drawText(text, x + 11f, centerY + 3.2f, label)
+            x += 11f + label.measureText(text) + 14f
+        }
+        if (marks.any { it.assists > 0 }) {
+            drawAssistBadge(canvas, x + BADGE_RADIUS, centerY, 1)
+            canvas.drawText(tr("Assist"), x + 11f, centerY + 3.2f, label)
+        }
+    }
+
     private fun drawPitch(
         canvas: Canvas,
         change: TimelineItem.LineupChange,
         playersById: Map<Long, Player>,
+        marks: Map<Long, GoalMarks>,
         left: Float,
         top: Float
     ) {
@@ -291,6 +365,11 @@ object MatchPdfExporter {
                 x, y + 2.7f, number
             )
             canvas.drawText(player?.name?.substringBefore(" ")?.take(10) ?: "", x, y + 15f, name)
+            // Badges on the top corners of the dot: the ball right, the assist left.
+            marks[position.playerId]?.let { mark ->
+                if (mark.goals > 0) drawGoalBadge(canvas, x + 6.5f, y - 6f, mark.goals)
+                if (mark.assists > 0) drawAssistBadge(canvas, x - 6.5f, y - 6f, mark.assists)
+            }
         }
     }
 

@@ -131,6 +131,13 @@
 - [ ] Phone in an unsupported language with "System": the app shows English
 - [ ] Have a native speaker read the live screen, camera tab and review screen in each language you ship
 
+## Goal and assist markers (pass 69)
+
+- [ ] Review > Timeline: the scorer has a ball badge and the assist giver an assist badge on the lineup picture of the spell in which the goal fell; a substitute who scores shows both the yellow highlight and the ball
+- [ ] Two goals by one player in one spell show "2" next to the ball
+- [ ] The same badges in the live match timeline and in the PDF summary, in each language
+- [ ] TalkBack on a lineup picture reads the goals and assists after the player's name
+
 ## Release signing
 
 - [ ] Build with your own release key (`RELEASE_SIGNING.md`), never with `app/debug.keystore`

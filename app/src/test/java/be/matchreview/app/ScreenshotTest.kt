@@ -14,6 +14,7 @@ import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import be.matchreview.app.domain.FormationLayout
@@ -231,6 +232,16 @@ open class ScreenshotTest {
     }
 
     @Test fun review() { val ids = fixture(); show("review/${ids.finishedId}"); capture("13-review") }
+
+    @Test
+    fun reviewTimeline() {
+        val ids = fixture()
+        show("review/${ids.finishedId}")
+        click("Timeline")
+        // Brings the starting lineup picture into view: its legend sits right under it.
+        compose.onAllNodesWithText(be.matchreview.app.i18n.tr("Assist")).onFirst().performScrollTo()
+        capture("13b-review-timeline")
+    }
 
     @Test fun backup() { fixture(); show("backup"); capture("14-backup") }
 
