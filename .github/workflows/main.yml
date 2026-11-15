@@ -15,6 +15,10 @@ on:
         description: "Render the main screens and print them as base64 PNG at the end of the log"
         type: boolean
         default: false
+      release:
+        description: "Publish a GitHub release of the version in app/build.gradle.kts (run on master)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -407,13 +411,17 @@ jobs:
           [[ -f gradle-tests-clean.log ]] && tail -n 200 gradle-tests-clean.log
           exit 1
 
-  # Publishes a GitHub release for a version tag (v1.7.0) once the build and tests passed.
+  # Publishes a GitHub release once the build and tests passed: for a pushed version tag
+  # (v1.7.0), or from "Run workflow" on master with "Publish a GitHub release" ticked, which
+  # tags the commit with the version in app/build.gradle.kts.
   # The APK is the signed release build when the release key is stored as secrets, and
   # otherwise the debug build signed with the committed debug key.
   release:
     name: Publish GitHub release
     needs: build
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: >-
+      startsWith(github.ref, 'refs/tags/v') ||
+      (github.event_name == 'workflow_dispatch' && inputs.release && github.ref == 'refs/heads/master')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -438,8 +446,16 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          tag="$GITHUB_REF_NAME"
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            tag="$GITHUB_REF_NAME"
+          else
+            tag="v$(sed -n 's/^ *versionName = "\(.*\)"/\1/p' app/build.gradle.kts)"
+          fi
           version="${tag#v}"
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            echo "::error::Release $tag already exists. Raise versionName for a new release."
+            exit 1
+          fi
           notes="release-notes/$tag.md"
           if [[ ! -f "$notes" ]]; then
             echo "::error::$notes is missing. Write the release notes before tagging."
@@ -460,6 +476,6 @@ jobs:
 
           gh release create "$tag" "$apk" \
             --repo "$GITHUB_REPOSITORY" \
-            --verify-tag \
+            --target "$GITHUB_SHA" \
             --title "MatchReview $version" \
             --notes-file notes.md

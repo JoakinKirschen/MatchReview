@@ -1596,7 +1596,7 @@ begin.
 
 ### Added or changed
 - Version 1.7.0 (`versionCode = 9`) with the scorer and assist markers (pass 69) and the Kotlin 2.0 / KSP build (pass 70).
-- GitHub Actions: pushing a `v*` tag builds and tests as usual, then a `release` job publishes a GitHub release with the APK attached and the notes from `release-notes/<tag>.md`. The APK is signed with the private release key when it is stored as secrets, otherwise with the committed debug key, and the release notes say which.
+- GitHub Actions: pushing a `v*` tag, or "Run workflow" on `master` with "Publish a GitHub release" ticked (which tags the commit with the version in `app/build.gradle.kts`), builds and tests as usual, then a `release` job publishes a GitHub release with the APK attached and the notes from `release-notes/<tag>.md`. The APK is signed with the private release key when it is stored as secrets, otherwise with the committed debug key, and the release notes say which.
 - `release-notes/v1.7.0.md`: what is new in 1.7.0.
 
 ### Tests and verification

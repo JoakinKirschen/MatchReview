@@ -148,5 +148,5 @@
 
 - [ ] `versionCode` and `versionName` raised in `app/build.gradle.kts`, README, `VERSIONING.md` and `BUILD_STATUS.md`
 - [ ] Release notes in `release-notes/v<version>.md`, merged to `master`
-- [ ] Tag the merge commit and push it: `git tag v<version> && git push origin v<version>`
-- [ ] GitHub Actions builds, tests and publishes the release with the APK; check its signing note
+- [ ] Publish: on GitHub, Actions → Android Build → Run workflow, branch `master`, tick "Publish a GitHub release". (Pushing a tag `v<version>` does the same.)
+- [ ] GitHub Actions builds, tests, tags the commit and publishes the release with the APK; check its signing note
