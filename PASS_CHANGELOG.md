@@ -1567,6 +1567,7 @@ begin.
 
 ### Tests and verification
 - `LineupGoalRulesTest`: goals across a substitution, two goals by one player, scorer and assist by one player, newest-first timelines, and goals that cannot be placed.
+- `ScreenshotTest.reviewTimeline` renders Review > Timeline with the marked starting lineup (`13b-review-timeline`).
 - Built and tested by GitHub Actions; no Android SDK in the cloud workspace.
 
 ### Deferred or known limitations
