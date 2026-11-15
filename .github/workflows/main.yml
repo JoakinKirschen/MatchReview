@@ -5,6 +5,9 @@ on:
   push:
     branches:
       - "**"
+    # A version tag such as v1.7.0 also publishes a GitHub release (see the release job).
+    tags:
+      - "v*"
   pull_request:
   workflow_dispatch:
     inputs:
@@ -403,3 +406,60 @@ jobs:
           echo "::error::Android unit tests failed."
           [[ -f gradle-tests-clean.log ]] && tail -n 200 gradle-tests-clean.log
           exit 1
+
+  # Publishes a GitHub release for a version tag (v1.7.0) once the build and tests passed.
+  # The APK is the signed release build when the release key is stored as secrets, and
+  # otherwise the debug build signed with the committed debug key.
+  release:
+    name: Publish GitHub release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      actions: read
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Download the APKs of this run
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name android-debug-apk --dir apks/debug
+          gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name android-release-apk --dir apks/release \
+            || echo "No signed release APK in this run: the release key is not stored as secrets."
+
+      - name: Create the release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="$GITHUB_REF_NAME"
+          version="${tag#v}"
+          notes="release-notes/$tag.md"
+          if [[ ! -f "$notes" ]]; then
+            echo "::error::$notes is missing. Write the release notes before tagging."
+            exit 1
+          fi
+          cp "$notes" notes.md
+
+          signed="$(find apks/release -name '*.apk' 2>/dev/null | head -n 1)"
+          if [[ -n "$signed" ]]; then
+            apk="MatchReview-$version.apk"
+            cp "$signed" "$apk"
+            echo "Signed with the release key. A phone with a build from GitHub Actions (debug key) must uninstall that first: make a backup, uninstall, install, restore." >> notes.md
+          else
+            apk="MatchReview-$version-debug-signed.apk"
+            cp "$(find apks/debug -name '*.apk' | head -n 1)" "$apk"
+            echo "Signed with the project's debug key, like the GitHub Actions builds: it installs over earlier GitHub Actions builds and keeps all data. Not for the Play Store." >> notes.md
+          fi
+
+          gh release create "$tag" "$apk" \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
+            --title "MatchReview $version" \
+            --notes-file notes.md

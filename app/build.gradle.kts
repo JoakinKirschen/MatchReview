@@ -34,8 +34,8 @@ android {
         applicationId = "be.matchreview.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 8
-        versionName = "1.6.0"
+        versionCode = 9
+        versionName = "1.7.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

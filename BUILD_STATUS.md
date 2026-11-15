@@ -2,18 +2,18 @@
 
 ## Release candidate
 
-- Version name: `1.6.0`
-- Version code: `8`
-- Includes implementation passes 1–66
+- Version name: `1.7.0`
+- Version code: `9`
+- Includes implementation passes 1–71
 - Room database version `6`
 - Backup format is `2` with restore support for legacy format `1`
 
 ## Workspace build result
 
-Passes 65–66 were compiled and tested in a cloud workspace with JDK 21, Android SDK 35 and
-the Gradle wrapper: all unit tests pass, including the Robolectric screenshot runs
-(upright, sideways, tablet and Dutch). GitHub Actions builds every pushed branch.
-No real device or emulator was available there; see `RELEASE_CHECKLIST.md`.
+Passes 69–71 were compiled and tested by GitHub Actions (Kotlin 2.0.21, Room on KSP): all
+unit tests pass, including the Robolectric screenshot runs (upright, sideways, tablet and
+Dutch). GitHub Actions builds every pushed branch, and a `v*` tag publishes a GitHub release.
+No real device or emulator was available; see `RELEASE_CHECKLIST.md`.
 
 ## Build locally
 

@@ -1,7 +1,7 @@
 # MatchReview Pass Changelog
 
 This is the **single source of truth** for implementation-pass notes and change tracking.
-It consolidates implementation notes for Passes 1–70.
+It consolidates implementation notes for Passes 1–71.
 
 ## How to maintain this file
 
@@ -37,7 +37,7 @@ For every future development pass:
 
 | Pass | Status | Planned change | Version impact |
 |---:|---|---|---|
-| 71 | Not scheduled | Add the next approved recommendation here | To be determined |
+| 72 | Not scheduled | Add the next approved recommendation here | To be determined |
 
 ## Documentation changes
 
@@ -1587,4 +1587,18 @@ begin.
 
 ### Tests and verification
 - GitHub Actions: APK built, all unit tests passed, Room schemas unchanged.
+
+## Pass 71 — Release 1.7.0
+
+**Status:** Completed  
+**Completed:** 2026-11-15  
+**Version impact:** App 1.7.0 (`versionCode = 9`); database 6 and backup format 2 unchanged
+
+### Added or changed
+- Version 1.7.0 (`versionCode = 9`) with the scorer and assist markers (pass 69) and the Kotlin 2.0 / KSP build (pass 70).
+- GitHub Actions: pushing a `v*` tag builds and tests as usual, then a `release` job publishes a GitHub release with the APK attached and the notes from `release-notes/<tag>.md`. The APK is signed with the private release key when it is stored as secrets, otherwise with the committed debug key, and the release notes say which.
+- `release-notes/v1.7.0.md`: what is new in 1.7.0.
+
+### Tests and verification
+- GitHub Actions on the branch and the `v1.7.0` tag.
 
