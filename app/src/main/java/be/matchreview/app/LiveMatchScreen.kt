@@ -1,4 +1,4 @@
-@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@file:OptIn(ExperimentalMaterial3Api::class)
 
 package be.matchreview.app
 
@@ -21,7 +21,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -38,9 +37,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
@@ -80,6 +77,8 @@ import be.matchreview.app.recording.MatchRecordingService
 import be.matchreview.app.recording.activeMatchId
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 private enum class LiveTab { MATCH, CAMERA, TIMELINE }
 
@@ -93,7 +92,6 @@ private data class GoalPlacementRequest(
     val offerScorerDetails: Boolean = false
 )
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LiveMatchScreen(
     matchId: Long,
@@ -144,7 +142,7 @@ fun LiveMatchScreen(
         do {
             nowMonotonic = SystemClock.elapsedRealtime()
             nowWall = System.currentTimeMillis()
-            if (current.clockRunning) delay(250)
+            if (current.clockRunning) delay(250.milliseconds)
         } while (current.clockRunning)
     }
 
@@ -263,7 +261,7 @@ fun LiveMatchScreen(
         liveActionLocked = true
         action()
         scope.launch {
-            delay(650)
+            delay(650.milliseconds)
             liveActionLocked = false
         }
     }
@@ -617,7 +615,7 @@ fun LiveMatchScreen(
 
     val leastPlayedBench = PlayingTimeRules.leastPlayed(eligibleBenchIds, ::playedMs)
     val sortedBench = bench.sortedWith(
-        compareBy<MatchLineupPlacement>({ it.playerId !in eligibleBenchIds }, { playedMs(it.playerId) })
+        compareBy({ it.playerId !in eligibleBenchIds }, { playedMs(it.playerId) })
     )
     val benchCard: @Composable (MatchLineupPlacement, Modifier) -> Unit = { placement, modifier ->
         playersById[placement.playerId]?.let { player ->
@@ -726,15 +724,6 @@ fun LiveMatchScreen(
                 modifier = Modifier.weight(1f),
                 onPlayEvent = { selectedVideoEvent = it },
                 onEditGoal = { editGoal = it },
-                onEditGoalPosition = { event ->
-                    goalPlacement = GoalPlacementRequest(
-                        eventId = event.id,
-                        title = if (event.type == "OPPONENT_GOAL") tr("Where did {opponent} score?", "opponent" to current.opponent)
-                        else tr("Where did {teamName} score?", "teamName" to teamName),
-                        initialX = event.goalX,
-                        initialY = event.goalY
-                    )
-                },
                 onDeleteGoal = { pendingGoalDeletion = it },
                 onDeleteEvent = { pendingEventDeletion = it },
                 undoableRoundId = undoableRoundId,
@@ -1351,7 +1340,6 @@ fun LiveMatchScreen(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun RecordingStatusChip(
     state: CameraRecordingState,
@@ -1387,7 +1375,7 @@ private fun RecordingStatusChip(
     LaunchedEffect(recording?.segmentId) {
         while (recording != null) {
             now = SystemClock.elapsedRealtime()
-            delay(1_000)
+            delay(1.seconds)
         }
     }
     val label = when (state) {
@@ -1455,7 +1443,6 @@ private fun PlayerChoiceSheet(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun GoalEditSheet(
     event: MatchEvent,
@@ -1607,7 +1594,6 @@ private fun MatchTimeline(
     modifier: Modifier,
     onPlayEvent: (MatchEvent) -> Unit,
     onEditGoal: (MatchEvent) -> Unit,
-    onEditGoalPosition: (MatchEvent) -> Unit,
     onDeleteGoal: (MatchEvent) -> Unit,
     onDeleteEvent: (MatchEvent) -> Unit,
     undoableRoundId: Long?,
@@ -1647,7 +1633,6 @@ private fun MatchTimeline(
                     recordings = recordings,
                     onPlayEvent = onPlayEvent,
                     onEditGoal = onEditGoal,
-                    onEditGoalPosition = onEditGoalPosition,
                     onDeleteGoal = onDeleteGoal,
                     onDeleteEvent = onDeleteEvent
                 )
@@ -1685,7 +1670,6 @@ private fun TimelineEventCard(
     recordings: List<RecordingSegment>,
     onPlayEvent: (MatchEvent) -> Unit,
     onEditGoal: (MatchEvent) -> Unit,
-    onEditGoalPosition: (MatchEvent) -> Unit,
     onDeleteGoal: (MatchEvent) -> Unit,
     onDeleteEvent: (MatchEvent) -> Unit
 ) {
@@ -1896,7 +1880,7 @@ private fun BenchMinuteCard(
     stateLabel: String?,
     highlighted: Boolean,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier.width(78.dp).fillMaxHeight()
+    modifier: Modifier = Modifier
 ) {
     Surface(
         shape = MaterialTheme.shapes.small,

@@ -3,8 +3,9 @@ pluginManagement {
     // resolve Android/Kotlin plugins even if a module declaration omits a version.
     plugins {
         id("com.android.application") version "8.6.1"
-        id("org.jetbrains.kotlin.android") version "1.9.24"
-        id("org.jetbrains.kotlin.kapt") version "1.9.24"
+        id("org.jetbrains.kotlin.android") version "2.0.21"
+        id("org.jetbrains.kotlin.plugin.compose") version "2.0.21"
+        id("com.google.devtools.ksp") version "2.0.21-1.0.28"
     }
     repositories {
         google()

@@ -74,7 +74,7 @@ GitHub Actions (`.github/workflows/main.yml`) builds every pushed branch and pul
 runs the tests and uploads the debug APK as the `android-debug-apk` artifact. With the release
 key stored as repository secrets it also uploads a signed `android-release-apk`.
 
-Toolchain: Android Gradle Plugin 8.6.1, Gradle 8.9 (wrapper), Kotlin 1.9.24, Java 17,
+Toolchain: Android Gradle Plugin 8.6.1, Gradle 8.9 (wrapper), Kotlin 2.0.21 with its Compose compiler plugin, Java 17,
 compile/target SDK 35, Jetpack Compose, Room, CameraX and Media3.
 
 ## Translations

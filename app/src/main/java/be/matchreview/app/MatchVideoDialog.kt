@@ -24,7 +24,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.ViewSidebar
+import androidx.compose.material.icons.automirrored.filled.ViewSidebar
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -188,7 +188,7 @@ fun MatchVideoDialog(
                                 colors = IconButtonDefaults.iconButtonColors(containerColor = Color(0x80000000))
                             ) {
                                 Icon(
-                                    Icons.Default.ViewSidebar,
+                                    Icons.AutoMirrored.Filled.ViewSidebar,
                                     contentDescription = if (showList) tr("Hide periods and events") else tr("Show periods and events"),
                                     tint = Color.White
                                 )
