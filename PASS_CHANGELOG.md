@@ -1599,6 +1599,7 @@ begin.
 - GitHub Actions: pushing a `v*` tag, or "Run workflow" on `master` with "Publish a GitHub release" ticked (which tags the commit with the version in `app/build.gradle.kts`), builds and tests as usual, then a `release` job publishes a GitHub release with the APK attached and the notes from `release-notes/<tag>.md`. The APK is signed with the private release key when it is stored as secrets, otherwise with the committed debug key, and the release notes say which.
 - Targets Android 16: `compileSdk` and `targetSdk` 36 (Google Play's minimum for updates), with Android Gradle Plugin 8.9.1 and Gradle 8.11.1, which compiling against API 36 needs. CI installs platform 36 and build tools 36.0.0. Robolectric tests stay pinned to SDK 34. The back gesture already goes through Compose's `BackHandler`, so Android 16's predictive back keeps the live-match leave confirmation; orientation is not locked, so large screens are unaffected.
 - The release job no longer stops silently when there is no signed release APK.
+- Play Store build: with the release key stored as secrets, CI also builds the app bundle (`bundleRelease`), uploads it as the `android-play-bundle` artifact and attaches `MatchReview-<version>.aab` to the release. Running the release again for the same commit adds the files to the existing release, so the bundle can follow once the key is stored. `RELEASE_SIGNING.md` has step-by-step Play Store instructions.
 - `release-notes/v1.7.0.md`: what is new in 1.7.0.
 
 ### Tests and verification
