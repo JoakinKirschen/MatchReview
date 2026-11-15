@@ -143,3 +143,10 @@
 - [ ] Build with your own release key (`RELEASE_SIGNING.md`), never with `app/debug.keystore`
 - [ ] `apksigner verify --print-certs app/build/outputs/apk/release/app-release.apk` shows your certificate
 - [ ] Key and passwords are stored in two safe places
+
+## Publishing a release
+
+- [ ] `versionCode` and `versionName` raised in `app/build.gradle.kts`, README, `VERSIONING.md` and `BUILD_STATUS.md`
+- [ ] Release notes in `release-notes/v<version>.md`, merged to `master`
+- [ ] Tag the merge commit and push it: `git tag v<version> && git push origin v<version>`
+- [ ] GitHub Actions builds, tests and publishes the release with the APK; check its signing note

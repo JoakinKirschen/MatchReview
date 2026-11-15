@@ -4,7 +4,7 @@ An offline Android app for youth football coaches: pick the squad, set the lineu
 the match from the sideline (clock, goals, substitutions, playing time), film it, and
 review it afterwards. Everything stays on the phone; nothing is sent to a server.
 
-Current version: **1.6.0** (`versionCode 8`). Android 8.0 (API 26) or newer.
+Current version: **1.7.0** (`versionCode 9`). Android 8.0 (API 26) or newer.
 Languages: English, Dutch, French, German, Spanish, Italian and Turkish, chosen on the home
 screen, in Android 13+'s per-app language setting, or following the phone's language.
 
