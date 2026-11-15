@@ -16,7 +16,7 @@ on:
         type: boolean
         default: false
       release:
-        description: "Publish a GitHub release of the version in app/build.gradle.kts (run on master)"
+        description: "Publish a GitHub release of the version in app/build.gradle.kts (run on master); again to add the Play Store bundle"
         type: boolean
         default: false
 
@@ -29,8 +29,8 @@ concurrency:
 
 env:
   JAVA_VERSION: "17"
-  ANDROID_API_LEVEL: "35"
-  ANDROID_BUILD_TOOLS: "35.0.0"
+  ANDROID_API_LEVEL: "36"
+  ANDROID_BUILD_TOOLS: "36.0.0"
   # Unit-test failures fail the workflow; the APK and reports are still uploaded first.
   FAIL_ON_TEST_FAILURE: "true"
   TERM: "dumb"
@@ -296,7 +296,8 @@ jobs:
 
       # Only when the release key is stored as repository secrets (see RELEASE_SIGNING.md);
       # otherwise this step does nothing and the build stays green.
-      - name: Build signed release APK
+      # The Play Store takes the app bundle (.aab) signed with the upload key.
+      - name: Build signed release APK and Play Store bundle
         id: release
         if: steps.build.outcome == 'success'
         shell: bash
@@ -312,7 +313,7 @@ jobs:
           fi
           keystore="$RUNNER_TEMP/release.jks"
           echo "$KEYSTORE_BASE64" | base64 --decode > "$keystore"
-          MATCHREVIEW_KEYSTORE_FILE="$keystore" ./gradlew assembleRelease --console=plain --no-daemon
+          MATCHREVIEW_KEYSTORE_FILE="$keystore" ./gradlew assembleRelease bundleRelease --console=plain --no-daemon
           rm -f "$keystore"
           echo "built=true" >> "$GITHUB_OUTPUT"
 
@@ -322,6 +323,15 @@ jobs:
         with:
           name: android-release-apk
           path: "**/build/outputs/apk/release/*.apk"
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload Play Store bundle
+        if: steps.release.outputs.built == 'true'
+        uses: actions/upload-artifact@v6
+        with:
+          name: android-play-bundle
+          path: "**/build/outputs/bundle/release/*.aab"
           if-no-files-found: error
           retention-days: 30
 
@@ -440,6 +450,8 @@ jobs:
           gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name android-debug-apk --dir apks/debug
           gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name android-release-apk --dir apks/release \
             || echo "No signed release APK in this run: the release key is not stored as secrets."
+          gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name android-play-bundle --dir apks/bundle \
+            || echo "No Play Store bundle in this run: the release key is not stored as secrets."
 
       - name: Create the release
         shell: bash
@@ -452,9 +464,16 @@ jobs:
             tag="v$(sed -n 's/^ *versionName = "\(.*\)"/\1/p' app/build.gradle.kts)"
           fi
           version="${tag#v}"
+          existing=false
           if gh release view "$tag" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
-            echo "::error::Release $tag already exists. Raise versionName for a new release."
-            exit 1
+            # Running again for the same commit adds the files, for example the Play Store
+            # bundle once the release key is stored. A new commit needs a new version.
+            tagged="$(gh api "repos/$GITHUB_REPOSITORY/commits/$tag" --jq .sha)"
+            if [[ "$tagged" != "$GITHUB_SHA" ]]; then
+              echo "::error::Release $tag already exists for another commit. Raise versionName for a new release."
+              exit 1
+            fi
+            existing=true
           fi
           notes="release-notes/$tag.md"
           if [[ ! -f "$notes" ]]; then
@@ -463,19 +482,36 @@ jobs:
           fi
           cp "$notes" notes.md
 
-          signed="$(find apks/release -name '*.apk' 2>/dev/null | head -n 1)"
+          # apks/release and apks/bundle only exist when the release key is stored as secrets.
+          files=()
+          signed=""
+          if [[ -d apks/release ]]; then signed="$(find apks/release -name '*.apk' | head -n 1)"; fi
+          bundle=""
+          if [[ -d apks/bundle ]]; then bundle="$(find apks/bundle -name '*.aab' | head -n 1)"; fi
+          if [[ -n "$bundle" ]]; then
+            cp "$bundle" "MatchReview-$version.aab"
+            files+=("MatchReview-$version.aab")
+          fi
           if [[ -n "$signed" ]]; then
-            apk="MatchReview-$version.apk"
-            cp "$signed" "$apk"
-            echo "Signed with the release key. A phone with a build from GitHub Actions (debug key) must uninstall that first: make a backup, uninstall, install, restore." >> notes.md
+            cp "$signed" "MatchReview-$version.apk"
+            files+=("MatchReview-$version.apk")
+            printf '\n%s\n\n%s\n' \
+              "**For the Play Store:** upload \`MatchReview-$version.aab\` in Play Console (Test and release, choose a track, Create new release)." \
+              "**For a phone directly:** \`MatchReview-$version.apk\` is signed with the release key. A phone with a build from GitHub Actions (debug key) must uninstall that first: make a backup in the app, uninstall, install, restore." >> notes.md
           else
-            apk="MatchReview-$version-debug-signed.apk"
-            cp "$(find apks/debug -name '*.apk' | head -n 1)" "$apk"
-            echo "Signed with the project's debug key, like the GitHub Actions builds: it installs over earlier GitHub Actions builds and keeps all data. Not for the Play Store." >> notes.md
+            cp "$(find apks/debug -name '*.apk' | head -n 1)" "MatchReview-$version-debug-signed.apk"
+            files+=("MatchReview-$version-debug-signed.apk")
+            printf '\n%s\n' \
+              "The APK is signed with the project's debug key, like the GitHub Actions builds: it installs over earlier GitHub Actions builds and keeps all data. It is not for the Play Store." >> notes.md
           fi
 
-          gh release create "$tag" "$apk" \
-            --repo "$GITHUB_REPOSITORY" \
-            --target "$GITHUB_SHA" \
-            --title "MatchReview $version" \
-            --notes-file notes.md
+          if [[ "$existing" == true ]]; then
+            gh release upload "$tag" "${files[@]}" --repo "$GITHUB_REPOSITORY" --clobber
+            gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --notes-file notes.md
+          else
+            gh release create "$tag" "${files[@]}" \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title "MatchReview $version" \
+              --notes-file notes.md
+          fi

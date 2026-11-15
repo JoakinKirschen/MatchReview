@@ -8,7 +8,7 @@ Copy the included file to this exact repository path:
 
 The workflow:
 
-- installs Java 17 and Android API 35 / Build Tools 35.0.0;
+- installs Java 17 and Android API 36 / Build Tools 36.0.0;
 - validates the Gradle wrapper;
 - runs `clean`, `assembleDebug`, and `testDebugUnitTest`;
 - captures `--stacktrace`, `--info`, and warning output in `gradle-build.log`;

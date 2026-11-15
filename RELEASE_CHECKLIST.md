@@ -3,7 +3,7 @@
 ## Automated
 
 - [ ] `./gradlew testDebugUnitTest assembleDebug`
-- [ ] `./gradlew connectedDebugAndroidTest` on API 26 and API 35
+- [ ] `./gradlew connectedDebugAndroidTest` on API 26 and API 36
 - [ ] Confirm Room migration 1→2→3→4 with a copy of production data
 - [ ] Install the release candidate over the previous APK without clearing app data
 - [ ] Confirm app `versionCode` and `versionName` increased for the release
@@ -143,6 +143,11 @@
 - [ ] Build with your own release key (`RELEASE_SIGNING.md`), never with `app/debug.keystore`
 - [ ] `apksigner verify --print-certs app/build/outputs/apk/release/app-release.apk` shows your certificate
 - [ ] Key and passwords are stored in two safe places
+
+## Android 16 (target API 36)
+
+- [ ] On an Android 16 phone, the back gesture in the live match asks before leaving, and leaves substitution mode first when it is open
+- [ ] On a tablet or foldable, the app rotates and resizes without losing the match clock, camera or lineup drag
 
 ## Publishing a release
 
