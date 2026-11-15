@@ -46,6 +46,7 @@ import be.matchreview.app.domain.MatchIntegrityRules
 import be.matchreview.app.domain.VideoEventRules
 import be.matchreview.app.domain.GoalMouthGeometry
 import be.matchreview.app.domain.GoalSummaryRules
+import be.matchreview.app.domain.LineupGoalRules
 import be.matchreview.app.domain.StartingLineupRules
 import be.matchreview.app.domain.TimelineGrouping
 import be.matchreview.app.domain.TimelineItem
@@ -361,8 +362,10 @@ internal fun ReviewScreen(matchId: Long, vm: MainViewModel, nav: NavHostControll
             .withStartingLineup(current.id, events, participations, lineup)
             .sortedWith(compareBy<MatchEvent> { it.timestampMs }.thenBy { it.id })
             .partition(VideoEventRules::isImportedVideoTag)
+        val matchItems = TimelineGrouping.group(matchEvents)
+        val goalMarks = LineupGoalRules.marks(matchItems)
         listOf(
-            Triple(tr("Match events"), tr("Times are match time."), TimelineGrouping.group(matchEvents)),
+            Triple(tr("Match events"), tr("Times are match time."), matchItems),
             Triple(
                 tr("Imported video tags"),
                 tr("Times are positions in the imported video."),
@@ -377,6 +380,7 @@ internal fun ReviewScreen(matchId: Long, vm: MainViewModel, nav: NavHostControll
                 LineupChangeCard(
                     change = item,
                     playersById = playersById,
+                    marks = goalMarks[item.key].orEmpty(),
                     trailing = {
                         Column(horizontalAlignment = Alignment.End) {
                             if (VideoEventRules.isPlayable(first, recordings)) {

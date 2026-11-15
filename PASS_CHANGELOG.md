@@ -1,7 +1,7 @@
 # MatchReview Pass Changelog
 
 This is the **single source of truth** for implementation-pass notes and change tracking.
-It consolidates implementation notes for Passes 1–68.
+It consolidates implementation notes for Passes 1–69.
 
 ## How to maintain this file
 
@@ -37,7 +37,7 @@ For every future development pass:
 
 | Pass | Status | Planned change | Version impact |
 |---:|---|---|---|
-| 69 | Not scheduled | Add the next approved recommendation here | To be determined |
+| 70 | Not scheduled | Add the next approved recommendation here | To be determined |
 
 ## Documentation changes
 
@@ -1552,4 +1552,23 @@ begin.
 
 ### Tests and verification
 - `LanguageSettingsTest` (Robolectric, API 34) checks both directions of the language sync. A release build was signed with a throwaway key and verified with `apksigner`; without a key it builds unsigned.
+
+## Pass 69 — Scorer and assist markers on the lineup pictures
+
+**Status:** Completed  
+**Completed:** 2026-11-14  
+**Version impact:** None (still 1.6.0)
+
+### Added or changed
+- `LineupGoalRules`: puts each of our goals on the lineup picture that was on the pitch when it was scored (the last lineup change before it in timeline order), so every goal is marked once. Opponent goals, goals before the first picture and players who are not on the picture get no mark. Works on timelines listed oldest or newest first.
+- `LineupSnapshotPitch` / `LineupChangeCard`: a ball badge on the top-right of the scorer's circle (with a count from two goals on) and a blue assist badge on the top-left (with a count from two assists on). Both sit next to the yellow "came on" highlight. A small legend under the picture names only the badges it shows. Screen readers hear the goals and assists after each name. Shown in the review timeline and the live match timeline.
+- PDF match summary: the same badges, drawn on the "Starting lineup and changes" pitches, with a sentence and a legend above them when there is any mark.
+- New texts in all six translations, including the assist letter (P in French, V in German).
+
+### Tests and verification
+- `LineupGoalRulesTest`: goals across a substitution, two goals by one player, scorer and assist by one player, newest-first timelines, and goals that cannot be placed.
+- Built and tested by GitHub Actions; no Android SDK in the cloud workspace.
+
+### Deferred or known limitations
+- After a legacy substitution without a lineup picture, the last picture no longer matches the players on the pitch; a scorer who is not on it gets no mark.
 

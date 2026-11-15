@@ -62,6 +62,7 @@ import be.matchreview.app.domain.ClockRecoveryConfidence
 import be.matchreview.app.domain.GoalMouthGeometry
 import be.matchreview.app.domain.GoalkeeperRules
 import be.matchreview.app.domain.PlayingTimeRules
+import be.matchreview.app.domain.LineupGoalRules
 import be.matchreview.app.domain.LineupUndoRules
 import be.matchreview.app.domain.LiveClockRules
 import be.matchreview.app.domain.MatchActions
@@ -1619,6 +1620,7 @@ private fun MatchTimeline(
         return
     }
     val timelineItems = remember(events) { TimelineGrouping.group(events) }
+    val goalMarks = remember(timelineItems) { LineupGoalRules.marks(timelineItems) }
     LazyColumn(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -1629,6 +1631,7 @@ private fun MatchTimeline(
                 is TimelineItem.LineupChange -> LineupChangeCard(
                     change = item,
                     playersById = playersById,
+                    marks = goalMarks[item.key].orEmpty(),
                     trailing = {
                         Column(horizontalAlignment = Alignment.End) {
                             ClipButton(item.events.first(), recordings, onPlayEvent)
