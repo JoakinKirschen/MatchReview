@@ -1581,7 +1581,7 @@ begin.
 
 ### Added or changed
 - Kotlin 2.0.21 with the `org.jetbrains.kotlin.plugin.compose` plugin instead of `composeOptions`. Android Studio's K2 mode only recognises Compose through this plugin and marked every composable call in the Kotlin 1.9 project as an error.
-- Room 2.6.1 stays on kapt; kapt gets `kotlinx-metadata-jvm` 0.9.0 so Room can read Kotlin 2 class metadata. Kapt warns that it falls back to language version 1.9; moving Room to KSP would remove that.
+- Room 2.6.1 generates its code with KSP (`com.google.devtools.ksp` 2.0.21-1.0.28) instead of kapt, which does not support Kotlin 2 and fell back to language version 1.9. The schema export location is unchanged.
 - `LiveMatchScreen`: removed unused imports, a redundant qualifier, repeated opt-ins and the unused goal-position callback of the live timeline (the goal editor sets the position); `delay()` takes durations, `compareBy` infers its type, `BenchMinuteCard` has a plain `Modifier` default.
 - `MatchVideoDialog`: the auto-mirrored sidebar icon replaces the deprecated one.
 

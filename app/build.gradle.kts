@@ -5,7 +5,8 @@ plugins {
     id("org.jetbrains.kotlin.android")
     // The Compose compiler ships with Kotlin 2; Android Studio's K2 mode needs this plugin.
     id("org.jetbrains.kotlin.plugin.compose")
-    id("org.jetbrains.kotlin.kapt")
+    // Generates Room's database code (KSP replaces kapt, which does not support Kotlin 2).
+    id("com.google.devtools.ksp")
 }
 
 /**
@@ -91,11 +92,8 @@ android {
     }
 }
 
-kapt {
-    correctErrorTypes = true
-    arguments {
-        arg("room.schemaLocation", "$projectDir/schemas")
-    }
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
 }
 
 dependencies {
@@ -112,9 +110,7 @@ dependencies {
 
     implementation("androidx.room:room-runtime:2.6.1")
     implementation("androidx.room:room-ktx:2.6.1")
-    kapt("androidx.room:room-compiler:2.6.1")
-    // Room 2.6.1 reads class metadata with an older library that rejects Kotlin 2 metadata.
-    kapt("org.jetbrains.kotlinx:kotlinx-metadata-jvm:0.9.0")
+    ksp("androidx.room:room-compiler:2.6.1")
 
     implementation("androidx.media3:media3-exoplayer:1.3.1")
     implementation("androidx.media3:media3-ui:1.3.1")
