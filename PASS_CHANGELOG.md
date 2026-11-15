@@ -1,7 +1,7 @@
 # MatchReview Pass Changelog
 
 This is the **single source of truth** for implementation-pass notes and change tracking.
-It consolidates implementation notes for Passes 1–69.
+It consolidates implementation notes for Passes 1–70.
 
 ## How to maintain this file
 
@@ -37,7 +37,7 @@ For every future development pass:
 
 | Pass | Status | Planned change | Version impact |
 |---:|---|---|---|
-| 70 | Not scheduled | Add the next approved recommendation here | To be determined |
+| 71 | Not scheduled | Add the next approved recommendation here | To be determined |
 
 ## Documentation changes
 
@@ -1572,4 +1572,19 @@ begin.
 
 ### Deferred or known limitations
 - After a legacy substitution without a lineup picture, the last picture no longer matches the players on the pitch; a scorer who is not on it gets no mark.
+
+## Pass 70 — Kotlin 2.0 and Android Studio warnings
+
+**Status:** Completed  
+**Completed:** 2026-11-15  
+**Version impact:** None (still 1.6.0)
+
+### Added or changed
+- Kotlin 2.0.21 with the `org.jetbrains.kotlin.plugin.compose` plugin instead of `composeOptions`. Android Studio's K2 mode only recognises Compose through this plugin and marked every composable call in the Kotlin 1.9 project as an error.
+- Room 2.6.1 stays on kapt; kapt gets `kotlinx-metadata-jvm` 0.9.0 so Room can read Kotlin 2 class metadata. Kapt warns that it falls back to language version 1.9; moving Room to KSP would remove that.
+- `LiveMatchScreen`: removed unused imports, a redundant qualifier, repeated opt-ins and the unused goal-position callback of the live timeline (the goal editor sets the position); `delay()` takes durations, `compareBy` infers its type, `BenchMinuteCard` has a plain `Modifier` default.
+- `MatchVideoDialog`: the auto-mirrored sidebar icon replaces the deprecated one.
+
+### Tests and verification
+- GitHub Actions: APK built, all unit tests passed, Room schemas unchanged.
 
