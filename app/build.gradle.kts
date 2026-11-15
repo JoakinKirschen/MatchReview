@@ -28,12 +28,12 @@ val releaseKey: Map<String, String>? = run {
 
 android {
     namespace = "be.matchreview.app"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "be.matchreview.app"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 9
         versionName = "1.7.0"
 

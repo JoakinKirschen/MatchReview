@@ -17,7 +17,7 @@ No real device or emulator was available; see `RELEASE_CHECKLIST.md`.
 
 ## Build locally
 
-Install Android Studio with JDK 17 and Android SDK 35, then run:
+Install Android Studio with JDK 17 and Android SDK 36, then run:
 
 ```bash
 ./gradlew clean testDebugUnitTest assembleDebug

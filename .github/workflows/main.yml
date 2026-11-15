@@ -29,8 +29,8 @@ concurrency:
 
 env:
   JAVA_VERSION: "17"
-  ANDROID_API_LEVEL: "35"
-  ANDROID_BUILD_TOOLS: "35.0.0"
+  ANDROID_API_LEVEL: "36"
+  ANDROID_BUILD_TOOLS: "36.0.0"
   # Unit-test failures fail the workflow; the APK and reports are still uploaded first.
   FAIL_ON_TEST_FAILURE: "true"
   TERM: "dumb"
@@ -463,7 +463,9 @@ jobs:
           fi
           cp "$notes" notes.md
 
-          signed="$(find apks/release -name '*.apk' 2>/dev/null | head -n 1)"
+          # apks/release only exists when the release key is stored as secrets.
+          signed=""
+          if [[ -d apks/release ]]; then signed="$(find apks/release -name '*.apk' | head -n 1)"; fi
           if [[ -n "$signed" ]]; then
             apk="MatchReview-$version.apk"
             cp "$signed" "$apk"
